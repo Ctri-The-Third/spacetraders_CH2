@@ -1,0 +1,38 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+    integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+    crossorigin="anonymous"></script>
+<script src="static/scripts/handlers.js"></script>
+<script>
+
+</script>
+
+<script type="text/javascript" charset="utf-8">
+
+    socket.on('connect', function () {
+        socket.emit('my event', { data: 'I\'m connected!' });
+    });
+
+
+
+    console.log(arg);
+</script>
+
+
+list all ships: <input type="button" value="Click me" onclick="socket.emit('list-ships');"><br />
+fetch all markets <input type="button" value="Click me" onclick="socket.emit('fetch-markets');"><br />
+<div id="controls">
+    #dropdown
+    <select id="list_of_ship_symbols">
+        <option value="1">1</option>
+        <option value="2">2</option>
+    </select>
+
+    <input type="text" id="destination" placeholder="X1-TEST-A1" />
+    <input type="button" value="Travel"
+        onclick="socket.emit('travel', {'ship_id': document.getElementById('list_of_ship_symbols').value, 'destination': document.getElementById('destination').value});" />
+</div>
+
+<div id="logs_output" style="border:1px solid red;">
+
+
+</div>
