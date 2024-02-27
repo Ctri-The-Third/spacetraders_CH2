@@ -1,0 +1,116 @@
+body {
+    height: 100%;
+    background-color: #333;
+    color: #cfc;
+
+}
+
+.main_body {
+    height: 100%;
+    background-color: #333;
+    color: #cfc;
+}
+
+body a {
+    color: #7f7;
+}
+
+.large-square {
+
+    height: 800px;
+    font-family: monospace, 'Courier New', Courier;
+
+}
+
+.small-square {
+    border: 2px solid green;
+    border-radius: 10px;
+    padding: 5px;
+    max-height: 400px;
+    min-height: 200px;
+    font-family: monospace, 'Courier New', Courier;
+    font-size: 10px;
+    overflow-y: scroll;
+}
+
+.tall-square {
+    border: 2px solid green;
+    border-radius: 10px;
+    padding: 5px;
+    max-height: 2000px;
+    min-height: 400px;
+    font-family: monospace, 'Courier New', Courier;
+    font-size: 10px;
+    overflow-y: hidden;
+
+}
+
+.small-square h1 {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.small-square hr {
+    border: 1px solid green;
+    padding: 0px;
+    margin: 3px;
+}
+
+.table-responsive {
+    overflow-x: hidden;
+}
+
+
+.all_exports th {
+    padding-right: 5px
+}
+
+.all_exports td {
+    padding-right: 12px;
+    padding-left: 3px;
+    border-left: 1px solid green;
+}
+
+.all_exports .requirements {
+    font-size: 11px;
+}
+
+.highlighted {
+    background-color: #555;
+
+}
+
+.system_row {
+    margin-top: 2px;
+    border: 2px solid green;
+    border-bottom: 1px solid green;
+    border-top: 1px solid green;
+    border-radius: 10px;
+    padding: 4px;
+    text-align: center;
+
+}
+
+.main_colour {
+    background-color: #333;
+    color: #cfc;
+}
+
+label {
+
+    color: #cfc;
+}
+
+.system_overview div {
+    border: 2px solid green;
+    border-radius: 10px;
+    padding: 2px;
+    text-align: center;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #7f7;
+    border-bottom: 2px
+}

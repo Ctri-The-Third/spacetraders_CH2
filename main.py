@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect
 from flask_socketio import SocketIO, send, emit
 from functools import wraps
 import straders_sdk, straders_sdk.utils, straders_sdk.request_consumer
-import straders_sdk.clients
+import straders_sdk.clients, straders_sdk.models
 import os
 from straders_sdk.clients import SpaceTradersApiClient, SpaceTradersMediatorClient
 from straders_sdk.responses import RemoteSpaceTradersRespose
@@ -70,13 +70,15 @@ def login():
     params = {}
 
     if request.method == "POST":
-        token = request.form.get("token", "")
+        token = request.form.get("agent_token", "")
         params["token"] = token
         agent_name = request.form.get("agent_name")
         params["agent_name"] = agent_name
+        success = False
         if token:
             with open("token.secret", "w") as f:
                 f.write(token)
+                success = True
         elif agent_name:
             resp = api_client.register(
                 agent_name,
@@ -84,11 +86,46 @@ def login():
             if resp:
                 with open("token.secret", "w+") as f:
                     f.write(api_client.token)
+                    success = True
             else:
                 params["error"] = "Failed to register"
                 params["error_detail"] = resp.error
+        if success:
+            api_client.set_current_agent(agent_name, token)
+            mediator_client.set_current_agent(agent_name, token)
+            return redirect("/")
 
     return render_template("login.html", **params)
+
+
+@app.route("/ship")
+@check_login
+def ship_list():
+    return render_template("ship_list.html")
+
+
+@app.route("/ship/<ship_name>")
+@check_login
+def display_ship_panel(ship_name):
+    ship = mediator_client.ships_view_one(ship_name)
+    if not ship:
+        return "Ship not found"
+        # redirect to the ship list page.
+    params = {}
+    params["ship_name"] = ship_name
+    params["ship_role"] = ship.role
+    params["ship_frame"] = ship.frame.symbol
+    params["frame_condition"] = ship.frame.condition
+
+    params["nav_status"] = ship.nav.status
+    params["system"] = ship.nav.system_symbol
+    params["waypoint"] = ship.nav.waypoint_symbol
+    params["cargo"] = []
+    for c in ship.cargo_inventory:
+        item = {"symbol": c.symbol, "quantity": c.units}
+        params["cargo"].append(item)
+
+    return render_template("ship_panel.html", **params)
 
 
 @socketio.on("travel")
