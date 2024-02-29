@@ -7,7 +7,7 @@ import os
 from straders_sdk.clients import SpaceTradersApiClient, SpaceTradersMediatorClient
 from straders_sdk.responses import RemoteSpaceTradersRespose
 import ship_handler_functions as shf
-import time
+import time, json
 from straders_sdk.utils import waypoint_to_system
 
 app = Flask("C'tri's SpaceTraders Client")
@@ -112,28 +112,45 @@ def display_ship_panel(ship_name):
         return "Ship not found"
         # redirect to the ship list page.
     params = {}
-    params["ship_name"] = ship_name
-    params["ship_role"] = ship.role
-    params["ship_frame"] = ship.frame.symbol
-    params["frame_condition"] = ship.frame.condition
+    params["ship"] = shf.ship_to_dict(ship)
+    waypoint = mediator_client.waypoints_view_one(ship.nav.waypoint_symbol)
+    waypoint: straders_sdk.models.Waypoint
+    params["waypoint"] = shf.waypoint_to_dict(waypoint)
+    if waypoint.has_market:
+        market = mediator_client.system_market(waypoint)
+        params["market"] = shf.market_to_dict(market)
 
-    params["nav_status"] = ship.nav.status
-    params["system"] = ship.nav.system_symbol
-    params["waypoint"] = ship.nav.waypoint_symbol
-    params["cargo"] = []
-    for c in ship.cargo_inventory:
-        item = {"symbol": c.symbol, "quantity": c.units}
-        params["cargo"].append(item)
-
+    if waypoint.has_shipyard:
+        shipyard = mediator_client.system_shipyard(waypoint)
+        params["shipyard"] = shf.shipyard_to_dict(shipyard)
+    if waypoint.under_construction:
+        construction = mediator_client.system_construction(waypoint)
+        params["construction"] = shf.construction_to_dict(construction)
     return render_template("ship_panel.html", **params)
 
 
 @socketio.on("travel")
 def travel(data):
     # get the ship ID from the data, and the destination
-    ship_id = data.get("ship_id")
+    ship_id = data.get("ship_name")
     destination = data.get("destination")
     shf.intrasolar_travel(mediator_client, ship_id, destination)
+
+
+@socketio.on("buy")
+def buy(data):
+    ship_id = data.get("ship_name")
+    good = data.get("good")
+    quantity = data.get("quantity", 0)
+    shf.buy(mediator_client, ship_id, good, quantity)
+
+
+@socketio.on("sell")
+def sell(data):
+    ship_id = data.get("ship_name")
+    good = data.get("good")
+    quantity = data.get("quantity", 0)
+    shf.sell(mediator_client, ship_id, good, quantity)
 
 
 @socketio.on("fetch-markets")
@@ -149,6 +166,27 @@ def fetch_markets():
         market = mediator_client.system_market(waypoint)
 
 
+@socketio.on("fetch-market")
+def fetch_market(data):
+    if not isinstance(data, str):
+        send("Invalid data type")
+    waypoint = mediator_client.waypoints_view_one(data)
+    if not waypoint:
+        send(f"Waypoint not found - {waypoint.error_code}")
+        return
+
+    market = mediator_client.system_market(waypoint)
+    market: straders_sdk.models.Market
+    if market.is_stale(15):
+        new_market = mediator_client.system_market(waypoint, True)
+        # if the new market doesn't have listings (Because a ship isn't present) then stale data is more valuable.
+        if new_market.listings:
+
+            market = new_market
+
+    emit("market_update", shf.market_to_dict(market))
+
+
 @socketio.on("list-ships")
 def list_ships():
     # send several events - first, a generic acknolwedgement
@@ -159,6 +197,20 @@ def list_ships():
     ship_names = [ship for ship in ships]
     emit("list-ships", ship_names)
     emit("logs-response", "Done listing ships")
+
+
+@socketio.on("fetch-ship")
+def fetch_ship(data):
+    ship = mediator_client.ships_view_one(data, True)
+    emit("ship_update", shf.ship_to_dict(ship))
+
+
+@socketio.on("refuel")
+# get the "ship_id" from the payload
+def refuel(data):
+    ship_name = data.get("ship_name")
+    # call the refuel function
+    shf.refuel(mediator_client, ship_name)
 
 
 @socketio.on("connect")

@@ -2,19 +2,111 @@
 <html lang="en">
 
 {% include '_header.html' %}
+<h1>{{ship.symbol}} <a onclick="socket.emit('fetch-ship','{{ship.symbol}}');return false;">🔃</a>
+</h1>
+<input type="hidden" id="active_ship" value="{{ship.symbol}}" />
+{{ship.registration.role}} <br />
+Hull: {{ship.frame.name}} (<span id="{{ship.symbol}}_frame_condition">{{ship.frame.condition}}</span>/100)<br />
+Reactor: {{ship.reactor.name}} (<span
+    id="{{ship.symbol}}_reactor_condition">{{ship.reactor.condition}}</span>/100)<br />
+Engines: {{ship.engine.name}} (<span id="{{ship.symbol}}_engines_condition">{{ship.engine.condition}}</span>/100)<br />
+<hr />
+Status: <span class="ship_info" id="{{ship.symbol}}_nav_status">{{ship.nav.status}}</span> <br />
+System: <span class="ship_info" id="system">{{ship.nav.systemSymbol}}</span> <br />
+Waypoint: <span class="ship_info" id="{{ship.symbol}}_nav_waypointSymbol">{{ship.nav.waypointSymbol}}</span> <br />
+<input type="text" id="destination" placeholder="{{ship.nav.waypointSymbol}}" value="{{ship.nav.systemSymbol}}-" />
+<input type="button" value="travel" onclick="travel()" /><br />
+Fuel: <span class="ship_info" id="{{ship.symbol}}_fuel_current">{{ship.fuel.current}}</span>/{{ship.fuel.capacity}}
+<input type="button" value="Refuel" onclick="socket.emit('refuel', {'ship_name':'{{ship.symbol}}'})" /><br />
+<br />
+Cargo: <span class="ship_info" id="{{ship.symbol}}_cargo_units">{{ship.cargo.units}}</span>/{{ship.cargo.capacity}}
+<br />
+-- list of items here --
+<div id="{{ship.symbol}}_cargo_inventory">
+    {% for c in ship.cargo.inventory %}
+    {{c.symbol}}: {{c.units}} <input type="button" value="sell"
+        onclick="socket.emit('sell', {'ship_name':'{{ship.symbol}}', 'good':'{{c.symbol}}', 'quantity':'{{c.units}}'})" />
 
 
-<h1> {{ship_name}}</h1>
-{{ship_role}}, {{ship_frame}} ({{frame_condition}}/100)<br />
+    <br />
+</div>
+{% endfor %}
+
+<br />
+Seconds till arrival: <span class="ship_info timer"
+    id="{{ship.symbol}}_nav_secondsRemaining">{{ship.nav.secondsRemaining}}</span> <br />
+cooldown time: <span class="ship_info timer"
+    id="{{ship.symbol}}_cooldown_remainingSeconds">{{ship.cooldown.remainingSeconds}}</span> <br />
 
 <hr />
-Status: {{nav_status}} <br />
-System: {{system}} <br />
-Waypoint: {{waypoint}} <br />
-Fuel
-Cargo
-nav time
-cooldown time
+Local waypoint info
 
+
+<div id="market_output" class="market_output">
+    <h3> Market info: <span id="market_output_symbol">{{market.symbol}}</span>
+        <a id="market_output_refresh_button"
+            onclick="socket.emit('fetch-market','{{market.symbol}}');return false;">🔃</a>
+    </h3>
+    Imports: <span id="market_output_imports">{% for good in market.imports %}<img
+            src="{{ url_for('static', filename = '/icons/GOOD_' + good.symbol + '.png')}}" />{{good.symbol}}, {%
+        endfor
+        %} </span><br />
+    Exports: <span id="market_output_exports">{% for good in market.exports %}<img
+            src="{{ url_for('static', filename = '/icons/GOOD_' + good.symbol + '.png')}}" />{{good.symbol}}, {%
+        endfor
+        %} </span><br />
+    Exchange goods: {% for good in market.exchange %}<span id="market_output_exchange"><img
+            src="{{ url_for('static', filename = '/icons/GOOD_' + good.symbol + '.png')}}" />{{good.symbol}}, {%
+        endfor
+        %} </span><br />
+    <table id="market_output_tradeGoods">
+        <tr>
+            <th>Good</th>
+            <th>status</th>
+            <th>prices</th>
+            <th>actions</th>
+        </tr>
+        {% for good in market.tradeGoods %}
+        <tr>
+            <td>
+                {{good.symbol}}:
+            </td>
+            <td>
+                <img src="{{ url_for('static', filename = '/icons/' + good.type + '.png')}}" />
+                <img src="{{ url_for('static', filename = '/icons/' + good.supply + '.png')}}" />
+                {% if good.activity is not none %}
+                <img src="{{ url_for('static', filename = '/icons/' + good.activity + '.png')}}" />
+                {% endif %}
+            </td>
+            <td>
+                {% if good.type == "EXPORT" %} buy for: {{good.purchasePrice}} {% endif %}
+                {% if good.type == "IMPORT" %} sell for: {{good.sellPrice}} {% endif %}
+                {% if good.type == "EXCHANGE"%} buy/sell for: {{good.purchasePrice}}/{{good.sellPrice}} {% endif %}
+            </td>
+            <td>
+                <input type="button" value="buy {{good.tradeVolume}}"
+                    onclick="socket.emit('buy', {'ship_name':'{{ship.symbol}}', 'good':'{{good.symbol}}', 'quantity':'{{good.tradeVolume}}'})" />
+                <input type="button" value="buy max"
+                    onclick="socket.emit('buy', {'ship_name':'{{ship.symbol}}', 'good':'{{good.symbol}}'})" />
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+
+</div>
+Local shipyard info (if any)
+
+Local construction info (if any)
+
+<div id="logs_output" class="logs_output">
+    hello?
+</div>
+
+<script>
+    function travel() {
+        var destination = document.getElementById('destination').value;
+        socket.emit('travel', { 'ship_name': '{{ship.symbol}}', 'destination': destination });
+    }
+</script>
 
 </html>
