@@ -5,17 +5,20 @@ from straders_sdk.clients import SpaceTradersMediatorClient
 from straders_sdk.pathfinder import PathFinder
 import time, math
 from datetime import datetime, timedelta
-
-
+from ship_locker import ShipLocker
+import threading
 import trademanager
 
 # ship_intrasolar
 # go_and_buy
 # go_and_sell
+locker = ShipLocker()
 
 
 def intrasolar_travel(client: SpaceTradersMediatorClient, ship_id: str, waypoint: str):
-
+    if not locker.lock_ship(ship_id, threading.current_thread().ident, 3600):
+        send(f"Unable to lock {ship_id} for intrasolar travel")
+        return
     ship = client.ships_view_one(ship_id)
     destination = client.waypoints_view_one(waypoint)
     pf = PathFinder(client)
@@ -74,6 +77,7 @@ def _travel_hop(client, ship, waypoint):
 
 
 def arrive_at_wayp_and_emit(client: SpaceTradersMediatorClient, waypoint_sym: str):
+
     current_waypoint = client.waypoints_view_one(waypoint_sym)
     if not current_waypoint:
         send(f"Waypoint not found - {current_waypoint.error_code}")
@@ -94,6 +98,9 @@ def arrive_at_wayp_and_emit(client: SpaceTradersMediatorClient, waypoint_sym: st
 
 
 def buy(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity: int):
+    if not locker.lock_ship(ship_name, threading.current_thread().ident, 3600):
+        send(f"Unable to lock {ship_name} for cargo buying")
+        return
     quantity = math.ceil(float(quantity))
 
     ship = client.ships_view_one(ship_name)
@@ -133,6 +140,9 @@ def buy(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity:
 
 
 def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity: int):
+    if not locker.lock_ship(ship_name, threading.current_thread().ident, 3600):
+        send(f"Unable to lock {ship_name} for cargo buying")
+        return
     quantity = math.ceil(float(quantity))
     ship = client.ships_view_one(ship_name)
     if not ship:
