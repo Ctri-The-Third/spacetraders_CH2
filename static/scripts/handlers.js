@@ -1,7 +1,7 @@
 const socket = io();
 
 // for example, when we receive a "ships-list" event, update the dropdown.
-socket.on("list-ships", function (data) {
+socket.on("list_ships", function (data) {
     console.log("Received list-ships event: " + data);
     var shipList = document.getElementById('list_of_ship_symbols');
 
@@ -36,24 +36,27 @@ function update_ship_object(prefix, ship) {
 
     // inventory wrapper 
     wrapper = document.getElementById(prefix + "_cargo_inventory");
-    wrapper.innerHTML = '';
-    for (key in ship.cargo.inventory) {
-        good = ship.cargo.inventory[key];
-        console.log(good)
-        for (key in good) {
-            console.log(key + " " + good[key])
+    if (wrapper) {
+        wrapper.innerHTML = '';
+        for (key in ship.cargo.inventory) {
+            good = ship.cargo.inventory[key];
+            console.log(good)
+            for (key in good) {
+                console.log(key + " " + good[key])
+            }
+
+            // add a the key, the units, and a button to sell
+            /*
+    {{c.symbol}}: {{c.units}} <input type="button" value="sell"
+    onclick="socket.emit('sell', {'ship_name':'{{ship.symbol}}', 'good':'{{c.symbol}}', 'quantity':'{{c.units}}'})" />
+    
+    */
+
+            var newDiv = document.createElement("div");
+            newDiv.innerHTML = good.symbol + ": " + good.units + " <input type='button' value='sell' onclick='socket.emit(\"sell\", {\"ship_name\":\"" + ship.symbol + "\", \"good\":\"" + good.symbol + "\"})' />";
+            wrapper.appendChild(newDiv);
+
         }
-        // add a the key, the units, and a button to sell
-        /*
-{{c.symbol}}: {{c.units}} <input type="button" value="sell"
-onclick="socket.emit('sell', {'ship_name':'{{ship.symbol}}', 'good':'{{c.symbol}}', 'quantity':'{{c.units}}'})" />
-
-*/
-
-        var newDiv = document.createElement("div");
-        newDiv.innerHTML = good.symbol + ": " + good.units + " <input type='button' value='sell' onclick='socket.emit(\"sell\", {\"ship_name\":\"" + ship.symbol + "\", \"good\":\"" + good.symbol + "\"})' />";
-        wrapper.appendChild(newDiv);
-
     }
     rec_update_ship_object(prefix, ship);
 }
@@ -129,9 +132,10 @@ socket.on("market_update", function (data) {
 });
 function update_market_object(prefix, market) {
 
-    document.getElementById(prefix + "_symbol").innerHTML = market.symbol;
+    element = document.getElementById(prefix + "_symbol")
+    if (element) { element.innerHTML = market.symbol };
     button = document.getElementById(prefix + "_refresh_button")
-    button.setAttribute("onclick", "socket.emit('fetch-market', '" + market.symbol + "')");
+    if (button) { button.setAttribute("onclick", "socket.emit('fetch-market', '" + market.symbol + "')"); }
 
     // -- IMPORTS --
     let content = '';
@@ -143,7 +147,8 @@ function update_market_object(prefix, market) {
     }
     //remove the trailing comma
     content = content.slice(0, -2);
-    document.getElementById(prefix + "_imports").innerHTML = content;
+    element = document.getElementById(prefix + "_imports")
+    if (element) { element.innerHTML = content; }
 
     // -- EXPORTS --
     content = '';
@@ -152,7 +157,8 @@ function update_market_object(prefix, market) {
 
     }
     content = content.slice(0, -2);
-    document.getElementById(prefix + "_exports").innerHTML = content;
+    element = document.getElementById(prefix + "_exports")
+    if (element) { element.innerHTML = content; }
 
     // -- EXCHANGE --
     content = '';
@@ -161,75 +167,108 @@ function update_market_object(prefix, market) {
 
     }
     content = content.slice(0, -2);
-    document.getElementById(prefix + "_exchange").innerHTML = content;
+    element = document.getElementById(prefix + "_exchange")
+    if (element) { element.innerHTML = content; }
+
 
     table = document.getElementById(prefix + "_tradeGoods");
-    table.innerHTML = '';
+    if (table) {
+        table.innerHTML = '';
 
-    var newRow = table.insertRow(-1);
-    newCell = document.createElement("th");
-    newCell.textContent = "Good";
-    newRow.appendChild(newCell);
+        var newRow = table.insertRow(-1);
+        newCell = document.createElement("th");
+        newCell.textContent = "Good";
+        newRow.appendChild(newCell);
 
-    newCell = document.createElement("th");
-    newCell.textContent = "Status";
-    newRow.appendChild(newCell);
+        newCell = document.createElement("th");
+        newCell.textContent = "Status";
+        newRow.appendChild(newCell);
 
-    newCell = document.createElement("th");
-    newCell.textContent = "Prices";
-    newRow.appendChild(newCell);
+        newCell = document.createElement("th");
+        newCell.textContent = "Prices";
+        newRow.appendChild(newCell);
 
-    newCell = document.createElement("th");
-    newCell.textContent = "Actions";
-    newRow.appendChild(newCell);
+        newCell = document.createElement("th");
+        newCell.textContent = "Actions";
+        newRow.appendChild(newCell);
 
 
-    for (var key in market.tradeGoods) {
-        tg = market.tradeGoods[key];
-        var newRow = table.insertRow();
-        var newCell = newRow.insertCell(0);
-        newCell.textContent = key;
+        for (var key in market.tradeGoods) {
+            tg = market.tradeGoods[key];
+            var newRow = table.insertRow();
+            var newCell = newRow.insertCell(0);
+            newCell.textContent = key;
 
-        var newCell = newRow.insertCell(1);
-        text_content = "<img src='/static/icons/" + tg.type + ".png'/>";
-        text_content += "<img src='/static/icons/" + tg.supply + ".png'/>";
-        if (tg.type != "EXCHANGE") { text_content += "<img src='/static/icons/" + tg.activity + ".png'/>" };
-        newCell.innerHTML = text_content;
+            var newCell = newRow.insertCell(1);
+            text_content = "<img src='/static/icons/" + tg.type + ".png'/>";
+            text_content += "<img src='/static/icons/" + tg.supply + ".png'/>";
+            if (tg.type != "EXCHANGE") { text_content += "<img src='/static/icons/" + tg.activity + ".png'/>" };
+            newCell.innerHTML = text_content;
 
-        var newCell = newRow.insertCell(2);
-        if (tg.type === "EXPORT") {
-            text_content = "buy for : " + tg.purchasePrice;
+            var newCell = newRow.insertCell(2);
+            if (tg.type === "EXPORT") {
+                text_content = "buy for : " + tg.purchasePrice;
+            }
+            else if (tg.type === "IMPORT") {
+                text_content = "sell for : " + tg.sellPrice;
+            }
+            else if (tg.type === "EXCHANGE") {
+                text_content = "buy/sell for : " + tg.purchasePrice + "/" + tg.sellPrice;
+            }
+            newCell.textContent = text_content;
+
+            var newCell = newRow.insertCell(3);
+
+            active_ship = document.getElementById('active_ship');
+            if (!active_ship) {
+
+                return;
+            }
+
+            emit_instruction = 'socket.emit(\"buy\", {\"ship_name\":\"' + active_ship.value + '\", \"good\":\"' + key + '\", \"quantity\":' + tg.tradeVolume + '})';
+            inner_html = "<input type = 'button' value = 'buy" + tg.tradeVolume + "' onclick='" + emit_instruction + "'/> ";
+
+            emit_instruction = 'socket.emit(\"buy\", {\"ship_name\":\"' + active_ship.value + '\", \"good\":\"' + key + '\"})';
+            inner_html += "<input type = 'button' value = 'buy max' onclick='" + emit_instruction + "'/>";
+            newCell.innerHTML = inner_html;
+
+
+            //<input type="button" value="buy max" onclick="socket.emit('buy', {'ship_name':'CTRI-W3-1', 'good':'POLYNUCLEOTIDES'})">
+            //<input type="button" value="buy MAX" onclick="socket.emit(" buy',="" {'ship_name':'ctri-w3-1',="" 'good':'fuel})'="">
         }
-        else if (tg.type === "IMPORT") {
-            text_content = "sell for : " + tg.sellPrice;
+    }
+}
+socket.on("agent_update", function (data) {
+    console.log("Agent update received: " + data);
+    //if data is a dict already, assign it to the ship variable. if it's a string, json parse it.
+    var agent = (typeof data === 'object') ? data : JSON.parse(data);
+    var symbol = agent.symbol;
+    // for each parameter, find the matching document ID and update it if it exists
+
+    var agent_out = document.getElementById("agent_" + symbol);
+    if (agent_out) {
+        console.log("Updating agent output for " + symbol + " in specific div");
+        prefix = "agent_" + symbol;
+    }
+    else {
+        console.log("updating agent output  in default div");
+        prefix = "agent_output";
+    }
+
+    update_agent_object(prefix, agent);
+});
+function update_agent_object(prefix, agent) {
+    // for each parameter, find the matching document ID and update it if it exists
+
+    for (var key in agent) {
+
+        var element = document.getElementById(prefix + "_" + key);
+        if (element) {
+            element.innerHTML = agent[key];
         }
-        else if (tg.type === "EXCHANGE") {
-            text_content = "buy/sell for : " + tg.purchasePrice + "/" + tg.sellPrice;
-        }
-        newCell.textContent = text_content;
-
-        var newCell = newRow.insertCell(3);
-
-        active_ship = document.getElementById('active_ship');
-        if (!active_ship) {
-
-            return;
-        }
-
-        emit_instruction = 'socket.emit(\"buy\", {\"ship_name\":\"' + active_ship.value + '\", \"good\":\"' + key + '\", \"quantity\":' + tg.tradeVolume + '})';
-        inner_html = "<input type = 'button' value = 'buy" + tg.tradeVolume + "' onclick='" + emit_instruction + "'/> ";
-
-        emit_instruction = 'socket.emit(\"buy\", {\"ship_name\":\"' + active_ship.value + '\", \"good\":\"' + key + '\"})';
-        inner_html += "<input type = 'button' value = 'buy max' onclick='" + emit_instruction + "'/>";
-        newCell.innerHTML = inner_html;
-
-
-        //<input type="button" value="buy max" onclick="socket.emit('buy', {'ship_name':'CTRI-W3-1', 'good':'POLYNUCLEOTIDES'})">
-        //<input type="button" value="buy MAX" onclick="socket.emit(" buy',="" {'ship_name':'ctri-w3-1',="" 'good':'fuel})'="">
 
     }
 }
-
 
 socket.on("logs-response", function (data) {
     console.log("logs-response: " + data);
@@ -267,7 +306,85 @@ socket.on("ship-update", function (data) {
     shipList.value = data;
 })
 
+socket.on("trades-update", function (data) {
 
+    div = document.getElementById('trades_output');
+    if (!div) { console.log("received trades-update but no trades_output found"); return }
+    for (system in data) {
+        prefix = "trades_" + system;
+        table = document.getElementById(prefix);
+
+
+        table.innerHTML = '';
+
+        var newRow = table.insertRow();
+        newCell = document.createElement("th");
+        newCell.textContent = "Symbol";
+        newRow.appendChild(newCell);
+
+        newCell = document.createElement("th");
+        newCell.textContent = "Start/end";
+        newRow.appendChild(newCell);
+
+        newCell = document.createElement("th");
+        newCell.textContent = "Distance";
+        newRow.appendChild(newCell);
+
+        newCell = document.createElement("th");
+        newCell.textContent = "Quantity";
+        newRow.appendChild(newCell);
+
+
+        newCell = document.createElement("th");
+        newCell.textContent = "q/hour";
+        newRow.appendChild(newCell);
+
+
+        newCell = document.createElement("th");
+        newCell.textContent = "profit_per_distance";
+        newRow.appendChild(newCell);
+
+        newCell = document.createElement("th");
+        newCell.textContent = "Execute";
+        newRow.appendChild(newCell);
+
+        for (var key in data[system]) {
+            op = data[system][key];
+            var newRow = table.insertRow();
+            var newCell = newRow.insertCell(0);
+            text_content = "<img src='/static/icons/GOOD_" + op.trade_symbol + ".png'/>" + op.trade_symbol;
+            newCell.innerHTML = text_content;
+
+            var newCell = newRow.insertCell(1);
+            text_content = op.start_location + " -> " + op.end_location;
+            newCell.innerHTML = text_content;
+
+            var newCell = newRow.insertCell(2);
+            text_content = op.distance;
+            newCell.innerHTML = text_content;
+
+            var newCell = newRow.insertCell(3);
+            text_content = op.total_quantity + " (" + op.export_tv + ")";
+            newCell.innerHTML = text_content;
+
+            var newCell = newRow.insertCell(4);
+            text_content = op.goods_produced_per_hour;
+            newCell.innerHTML = text_content;
+
+            var newCell = newRow.insertCell(5);
+            profit_per_distance = op.cph_of_goods_produced;
+            newCell.innerHTML = profit_per_distance;
+
+
+            var newCell = newRow.insertCell(6);
+            emit_instruction = 'execute_trade(\"' + op.trade_symbol + '\", \"' + op.start_location + '\", \"' + op.end_location + '\", \"' + op.total_quantity + '\")';
+            inner_html = "<input type = 'button' value = 'execute' onclick='" + emit_instruction + "'/> ";
+            newCell.innerHTML = inner_html;
+
+        }
+
+    }
+});
 
 // This function finds all divs with the class 'timer', and sets up an interval.
 function initializeTimers() {

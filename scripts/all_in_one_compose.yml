@@ -1,0 +1,30 @@
+version: '3.7'
+
+
+services:
+    spacetraders_db_instance:
+        image:  ctriatanitan/spacetraders_db
+        ports: 
+         - "6432:5432"
+        env_file:
+         - .env
+        networks:
+         - spacetraders_network
+
+    
+    ui:
+        image:  ctriatanitan/spacetraders_ch2_ui
+        ports: 
+         - "3000:3000"
+        depends_on: 
+         - spacetraders_db_instance
+        env_file:
+         - .env
+        networks:
+         - spacetraders_network
+
+
+
+networks: 
+    spacetraders_network:
+        driver: bridge

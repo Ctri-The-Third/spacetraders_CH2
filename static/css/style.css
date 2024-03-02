@@ -15,6 +15,7 @@ body a {
     color: #7f7;
 }
 
+
 .large-square {
 
     height: 800px;
@@ -121,4 +122,19 @@ label {
     font-weight: bold;
     color: #7f7;
     border-bottom: 2px
+}
+
+.ship-box {
+    border: 1px solid #0e0;
+    margin: 5px;
+    padding: 5px;
+    font-size: 10px;
+
+    overflow: hidden;
+
+}
+
+.ship-box a {
+
+    text-decoration: none;
 }

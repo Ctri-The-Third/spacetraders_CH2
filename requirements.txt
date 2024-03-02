@@ -1,2 +1,7 @@
 pytest
 flask 
+flask-socketio
+python-dateutil
+pytz
+gunicorn
+eventlet

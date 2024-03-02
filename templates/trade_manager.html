@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+
+{% include '_header.html' %}
+-- select of ships
+<select id="list_of_ship_symbols">
+    {% for ship in ships %}
+    <option value="{{ship.symbol}}">{{ship.symbol}}</option>
+    {% endfor %}
+</select>
+<h1>All trades <a onclick="socket.emit('fetch-trades');return false;">🔃</a></h1>
+<div id="trades_output" style="border:1px solid red;">
+    {% for system in trades %}
+    <h2>{{system}}</h2>
+    <table id="trades_{{system}}">
+        <tr>
+            <th>Symbol</th>
+            <th>Start/end</th>
+            <th>Distance</th>
+            <th>Quantity</th>
+            <th>q/hour</th>
+            <th>profit_per_distance</th>
+            <th>Execute</th>
+        </tr>
+
+        {% for trade in trades[system] %}
+        <tr>
+            <td><img
+                    src="{{ url_for('static', filename = '/icons/GOOD_' + trade.trade_symbol + '.png')}}" />{{trade.trade_symbol}}
+            </td>
+            <td>{{trade.start_location}}/{{trade.end_location}}</td>
+            <td>{{trade.distance}}</td>
+            <td>{{trade.total_quantity}} ({{trade.export_tv}})</td>
+            <td>{{trade.goods_produced_per_hour}}</td>
+            <td>{{trade.cph_of_goods_produced}}</td>
+            <td><input type="button" value="execute"
+                    onclick="execute_trade('{{trade.trade_symbol}}', '{{trade.start_location}}', '{{trade.end_location}}', '{{trade.total_quantity}}')" />
+            </td>
+
+        </tr>
+        {% endfor %}
+    </table>
+    {% endfor %}
+
+
+    <script>
+        function execute_trade(trade_symbol, start_location, end_location, quantity) {
+            socket.emit('execute-trade', {
+                'ship_name': document.getElementById('list_of_ship_symbols').value,
+                'trade_symbol': trade_symbol,
+                'start_location': start_location,
+                'end_location': end_location,
+                'quantity': quantity
+            })
+        }
+    </script>

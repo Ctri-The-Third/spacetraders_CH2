@@ -22,15 +22,15 @@ Fuel: <span class="ship_info" id="{{ship.symbol}}_fuel_current">{{ship.fuel.curr
 Cargo: <span class="ship_info" id="{{ship.symbol}}_cargo_units">{{ship.cargo.units}}</span>/{{ship.cargo.capacity}}
 <br />
 -- list of items here --
-<div id="{{ship.symbol}}_cargo_inventory">
+<div id="{{ship.symbol}}_cargo_inventory" style="border:1px solid green;">
     {% for c in ship.cargo.inventory %}
     {{c.symbol}}: {{c.units}} <input type="button" value="sell"
         onclick="socket.emit('sell', {'ship_name':'{{ship.symbol}}', 'good':'{{c.symbol}}', 'quantity':'{{c.units}}'})" />
-
+    {% endfor %}
 
     <br />
 </div>
-{% endfor %}
+
 
 <br />
 Seconds till arrival: <span class="ship_info timer"
@@ -41,8 +41,9 @@ cooldown time: <span class="ship_info timer"
 <hr />
 Local waypoint info
 
-
 <div id="market_output" class="market_output">
+
+    {% if "symbol" in market %}
     <h3> Market info: <span id="market_output_symbol">{{market.symbol}}</span>
         <a id="market_output_refresh_button"
             onclick="socket.emit('fetch-market','{{market.symbol}}');return false;">🔃</a>
@@ -91,8 +92,9 @@ Local waypoint info
             </td>
         </tr>
         {% endfor %}
-    </table>
 
+    </table>
+    {% endif %}
 </div>
 Local shipyard info (if any)
 

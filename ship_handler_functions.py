@@ -6,6 +6,9 @@ from straders_sdk.pathfinder import PathFinder
 import time, math
 from datetime import datetime, timedelta
 
+
+import trademanager
+
 # ship_intrasolar
 # go_and_buy
 # go_and_sell
@@ -35,33 +38,39 @@ def intrasolar_travel(client: SpaceTradersMediatorClient, ship_id: str, waypoint
     if distance < ship.fuel_current:
         # go direct
         send(f"Single hop route! {distance}u, {travel_time}s -  Skipping pathfinder")
-        if ship.nav.status == "DOCKED":
-            resp = client.ship_orbit(ship)
-            if not resp:
-                send("Error orbiting ship - " + resp.error_code)
-                return
-        resp = client.ship_move(ship, waypoint)
-        if not resp:
-            send(f"Error moving ship - {resp.error_code}")
-            return
-        send(f"Ship en route, sleeping for {ship.nav.travel_time_remaining} seconds")
-        emit("ship_update", ship_to_dict(ship), broadcast=True)
-
-        time.sleep(ship.nav.travel_time_remaining + 1)
-
-        ship.nav.status = "ORBIT"
-        ship.nav_dirty = True
-        client.update(ship)
-        send("Ship arrived")
-        arrive_at_wayp_and_emit(client, waypoint)
-        emit("ship_update", ship_to_dict(ship), broadcast=True)
+        _travel_hop(client, ship, waypoint)
 
     elif distance < ship.fuel_capacity:
         send(
             f"Single hop route - {distance}u, {travel_time} refueling then going direct"
         )
+
+        refuel(client, ship_id)
+        _travel_hop(client, ship, waypoint)
     else:
         send("Multi-hop route")
+
+
+def _travel_hop(client, ship, waypoint):
+    if ship.nav.status == "DOCKED":
+        resp = client.ship_orbit(ship)
+        if not resp:
+            send("Error orbiting ship - " + resp.error_code)
+            return
+    resp = client.ship_move(ship, waypoint)
+    if not resp:
+        send(f"Error moving ship - {resp.error_code}")
+        return
+    send(f"Ship en route, sleeping for {ship.nav.travel_time_remaining} seconds")
+    emit("ship_update", ship_to_dict(ship), broadcast=True)
+    time.sleep(ship.nav.travel_time_remaining + 1)
+
+    ship.nav.status = "ORBIT"
+    ship.nav_dirty = True
+    client.update(ship)
+    send("Ship arrived")
+    arrive_at_wayp_and_emit(client, waypoint)
+    emit("ship_update", ship_to_dict(ship), broadcast=True)
 
 
 def arrive_at_wayp_and_emit(client: SpaceTradersMediatorClient, waypoint_sym: str):
@@ -85,7 +94,7 @@ def arrive_at_wayp_and_emit(client: SpaceTradersMediatorClient, waypoint_sym: st
 
 
 def buy(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity: int):
-    quantity = int(quantity)
+    quantity = math.ceil(float(quantity))
 
     ship = client.ships_view_one(ship_name)
     if not ship:
@@ -98,23 +107,33 @@ def buy(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity:
     market = client.system_market(client.waypoints_view_one(ship.nav.waypoint_symbol))
     market: straders_sdk.models.Market
     tg = market.get_tradegood(good)
+    if not hasattr(tg, "trade_volume"):
+        market = client.system_market(
+            client.waypoints_view_one(ship.nav.waypoint_symbol), True
+        )
+        tg = market.get_tradegood(good)
     goods_to_buy = min(quantity, ship.cargo_space_remaining)
+    if not tg:
+        send(f"Trade good not found - {good}")
+        return
     tv = tg.trade_volume
     for i in range(math.ceil(goods_to_buy / tv)):
         resp = client.ship_purchase_cargo(ship, tg.symbol, min(tv, goods_to_buy))
         if not resp:
             send(f"Error buying {tg.symbol} - {resp.error_code}")
             emit("ship_update", ship_to_dict(ship), broadcast=True)
+            emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
             return
         goods_to_buy -= tv
         if goods_to_buy <= 0:
             break
     log_market_changes(client, ship.nav.waypoint_symbol)
     emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
 
 
 def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity: int):
-    quantity = int(quantity)
+    quantity = math.ceil(float(quantity))
     ship = client.ships_view_one(ship_name)
     if not ship:
         send(f"Ship not found - {ship.error_code}")
@@ -149,6 +168,7 @@ def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity
         if not resp:
             send(f"Error selling {tg.symbol} - {resp.error_code}")
             emit("ship_update", ship_to_dict(ship), broadcast=True)
+            emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
             return
         send(f"Sold {amount_to_sell} of {tg.symbol} for {tv * tg.sell_price} credits")
 
@@ -158,6 +178,26 @@ def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity
     log_market_changes(client, ship.nav.waypoint_symbol)
     ship = client.ships_view_one(ship_name)
     emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
+
+
+def execute_trade(
+    client: SpaceTradersMediatorClient,
+    ship_name: str,
+    trade_symbol: str,
+    start_location: str,
+    end_location: str,
+    quantity: int,
+):
+    tm = trademanager.TradeManager(client)
+    tm.claim_trade(trade_symbol, start_location, end_location, quantity)
+    emit("trades-update", tm.list_opportunities_for_json())
+    intrasolar_travel(client, ship_name, start_location)
+    buy(client, ship_name, trade_symbol, quantity)
+    intrasolar_travel(client, ship_name, end_location)
+    sell(client, ship_name, trade_symbol, quantity)
+    # need to instruct the
+    send("Trade complete")
 
 
 def refuel(client: SpaceTradersMediatorClient, ship_name: str):
@@ -263,6 +303,34 @@ def construction_to_dict(construction: straders_sdk.models.ConstructionSite):
     return {}
 
 
+def map_role(role) -> str:
+    roles = {
+        "COMMAND": "👑",
+        "EXCAVATOR": "⛏️",
+        "HAULER": "🚛",
+        "TRANSPORT": "🚚",
+        "SURVEYOR": "🔬",
+        "SATELLITE": "🛰️",
+        "REFINERY": "⚙️",
+        "EXPLORER": "🗺️",
+    }
+    return roles.get(role, role)
+
+
+def map_frame(frame) -> str:
+    frames = {
+        "FRAME_DRONE": "⛵",
+        "FRAME_PROBE": "⛵",
+        "FRAME_SHUTTLE": "⛵",
+        "FRAME_MINER": "🚤",
+        "FRAME_LIGHT_FREIGHTER": "🚤",
+        "FRAME_EXPLORER": "🚤",
+        "FRAME_FRIGATE": "🚤",
+        "FRAME_HEAVY_FREIGHTER": "⛴️",
+    }
+    return frames.get(frame, frame)
+
+
 def ship_to_dict(ship: straders_sdk.models.Ship):
 
     return_obj = {
@@ -271,6 +339,7 @@ def ship_to_dict(ship: straders_sdk.models.Ship):
             "name": ship.name,
             "factionSymbol": "string",
             "role": ship.role,
+            "emoji": map_role(ship.role),
         },
         "nav": {
             "systemSymbol": ship.nav.system_symbol,
@@ -301,6 +370,7 @@ def ship_to_dict(ship: straders_sdk.models.Ship):
             "moduleSlots": ship.frame.module_slots,
             "mountingPoints": ship.frame.mounting_points,
             "fuelCapacity": ship.fuel_capacity,
+            "emoji": map_frame(ship.frame.symbol),
             "requirements": {
                 "power": ship.frame.requirements.power,
                 "crew": ship.frame.requirements.crew,
@@ -361,3 +431,14 @@ def ship_to_dict(ship: straders_sdk.models.Ship):
         )
 
     return return_obj
+
+
+def agent_to_dict(agent: straders_sdk.models.Agent) -> dict:
+    return {
+        "accountId": agent.account_id,
+        "symbol": agent.symbol,
+        "headquarters": agent.headquarters,
+        "credits": agent.credits,
+        "startingFaction": agent.starting_faction,
+        "shipCount": agent.ship_count,
+    }

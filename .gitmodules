@@ -1,0 +1,3 @@
+[submodule "spacetraders_sdk"]
+	path = spacetraders_sdk
+	url = https://github.com/Ctri-The-Third/spacetraders_sdk

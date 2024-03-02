@@ -10,6 +10,9 @@ import ship_handler_functions as shf
 import time, json
 from straders_sdk.utils import waypoint_to_system
 
+from trademanager import TradeManager, TradeOpportunity
+
+
 app = Flask("C'tri's SpaceTraders Client")
 app.config["SECRET_KEY"] = "notreallythatsecret"
 socketio = SocketIO(app)
@@ -17,7 +20,7 @@ socketio = SocketIO(app)
 ST_HOST = os.environ.get("ST_DB_HOST", "localhost")
 ST_NAME = os.environ.get("ST_DB_NAME", "spacetraders")
 ST_USER = os.environ.get("ST_DB_USER", "spacetraders")
-ST_PASS = os.environ.get("ST_DB_PASS", "spacetraders")
+ST_PASS = os.environ.get("ST_DB_PASSWORD", "spacetraders")
 ST_PORT = os.environ.get("ST_DB_PORT", "5432")
 
 
@@ -47,10 +50,6 @@ def get_saved_token():
             return f.read()
     except FileNotFoundError:
         return None
-
-
-"X1-SZ74-K90"
-"X1-SZ74-A1"
 
 
 def check_login(route):
@@ -98,13 +97,18 @@ def login():
     return render_template("login.html", **params)
 
 
-@app.route("/ship")
+@app.route("/ships")
 @check_login
 def ship_list():
-    return render_template("ship_list.html")
+    ships = mediator_client.ships_view()
+    params = {
+        "ships": [shf.ship_to_dict(ship) for ship in ships.values()],
+        "agent": shf.agent_to_dict(mediator_client.view_my_self()),
+    }
+    return render_template("ship_list.html", **params)
 
 
-@app.route("/ship/<ship_name>")
+@app.route("/ships/<ship_name>")
 @check_login
 def display_ship_panel(ship_name):
     ship = mediator_client.ships_view_one(ship_name)
@@ -127,6 +131,17 @@ def display_ship_panel(ship_name):
         construction = mediator_client.system_construction(waypoint)
         params["construction"] = shf.construction_to_dict(construction)
     return render_template("ship_panel.html", **params)
+
+
+@app.route("/trades")
+@check_login
+def view_trade_manager():
+    tm = TradeManager(mediator_client)
+    params = {}
+    ships = mediator_client.ships_view()
+    params["trades"] = tm.list_opportunities_for_json()
+    params["ships"] = [shf.ship_to_dict(ship) for ship in ships.values()]
+    return render_template("trade_manager.html", **params)
 
 
 @socketio.on("travel")
@@ -164,6 +179,18 @@ def fetch_markets():
     waypoints = mediator_client.find_waypoints_by_trait(hq, "MARKETPLACE")
     for waypoint in waypoints:
         market = mediator_client.system_market(waypoint)
+
+
+@socketio.on("execute-trade")
+def execute_trade(data):
+    ship_id = data.get("ship_name")
+    trade_symbol = data.get("trade_symbol")
+    start_location = data.get("start_location")
+    end_location = data.get("end_location")
+    quantity = data.get("quantity", 0)
+    shf.execute_trade(
+        mediator_client, ship_id, trade_symbol, start_location, end_location, quantity
+    )
 
 
 @socketio.on("fetch-market")
@@ -205,6 +232,13 @@ def fetch_ship(data):
     emit("ship_update", shf.ship_to_dict(ship))
 
 
+@socketio.on("fetch-trades")
+def fetch_trades():
+    tm = TradeManager(mediator_client)
+    tm.populate_opportunities()
+    emit("trades-update", tm.list_opportunities_for_json())
+
+
 @socketio.on("refuel")
 # get the "ship_id" from the payload
 def refuel(data):
@@ -227,13 +261,8 @@ def handle_message(message):
 @app.route("/")
 @check_login
 def index():
-    return redirect("/socket_test")
-
-
-@app.route("/socket_test")
-@check_login
-def socket_test():
-    return render_template("socket_test.html")
+    params = {"agent": shf.agent_to_dict(mediator_client.view_my_self())}
+    return render_template("index.html", **params)
 
 
 token = get_saved_token()
@@ -244,5 +273,5 @@ if token:
 
 
 if __name__ == "__main__":
-
+    print("Hello, world!")
     socketio.run(app, port=3000)
