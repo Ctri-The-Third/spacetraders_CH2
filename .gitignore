@@ -129,3 +129,5 @@ dmypy.json
 .pyre/
 resources/
 *.secret
+scripts/PRD-build_and_run_everything.bat
+scripts/PRD-build_push_and_run_everything.bat
