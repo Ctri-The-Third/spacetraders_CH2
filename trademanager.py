@@ -11,76 +11,52 @@ class TradeOpportunity:
         self,
         client: SpaceTradersMediatorClient,
         export_tradegood: "TradeGood",
-        destination_tradegood: "TradeGood",
+        destination_tradegood: list["TradeGood"],
+        selected_destination: str = None,
+        mode="SKIM",
     ):
+        """An export/ exchange, and any matching destinations.
+        The mode determines how the traders should interact with the opportunity
+        * SKIM: if we're in abaundant, 2* TV
+        * SKIP: Nothing to do
+        * MANAGE: If weak/growing, trade until LIMITED. If strong, trade until MODERATE.
+        """
 
+        self.mode = mode
         self.client = client
         self.start_good = export_tradegood
         self.start_location = export_tradegood.waypoint
 
-        self.end_good = destination_tradegood
-        self.end_location = destination_tradegood.waypoint
-
+        self.possible_end_goods = destination_tradegood
+        self.selected_end_good = None
         self.trade_symbol = export_tradegood.symbol
         self._pathfinder = st_pathfinder.PathFinder(client)
-        self.distance = self._pathfinder.calc_distance_between(
-            self.start_location, self.end_location
-        )
-        activity_mod = {
+
+        self.end_location = None
+        self.distance = 0
+        self.profit_per_unit = 0
+        self.total_quantity = 0
+        self.export_tv = self.start_good.trade_volume
+        self.goods_produced_per_hour = 0
+        self.current_profit_ptrip_pvolume_phour = 0
+
+        self.activity_modifiers = {
             "RESTRICTED": 0.5,
             "WEAK": 1,
             "GROWING": 1.5,
             "STRONG": 2,
-            "UNKNOWN": 999,
         }
-        supplies = {
-            "ABUNDANT": 2 + 4,
-            "HIGH": 4,
-            "MODERATE": 0,
-            "LIMITED": 0,
-            "SCARCE": 0,
-        }
-        demands = {
-            "SCARCE": 16 + 8 + 8 + 4 + 2,
-            "LIMITED": 8 + 8 + 4 + 2,
-            "MODERATE": 8 + 4 + 2,
-            "HIGH": 4,
-            "ABUNDANT": 2,
-        }
-        self.distance = self._pathfinder.calc_distance_between(
-            self.start_location, self.end_location
-        )
-        self.profit_per_unit = self.end_good.sell_price - self.start_good.buy_price
-
-        if not self.start_good.buy_price:
-            supply_quantity = 18
-        else:
-            supply_quantity = (
-                supplies[self.start_good.supply] * self.start_good.trade_volume
-            )
-
-        if not self.end_good.sell_price:
-            demand_quantity = 18
-        else:
-            demand_quantity = demands[self.end_good.supply] * self.end_good.trade_volume
-
-        self.total_quantity = min(supply_quantity, demand_quantity)
-        self.export_tv = self.start_good.trade_volume
-        self.goods_produced_per_hour = (
-            self.start_good.trade_volume * activity_mod[self.start_good.activity]
-        )
-        # profit per trip
-        self.current_profit_ptrip_pvolume_phour = (
-            self.profit_per_unit / self.distance * self.export_tv
-        ) * activity_mod[self.start_good.activity]
+        if selected_destination:
+            self.select_destination(selected_destination)
 
     def __repr__(self) -> str:
         return f"{self.trade_symbol}: {self.start_location.symbol} -> {self.end_location.symbol}"
 
     def to_dict(self) -> dict:
-        return {
+        out_obj = {
             "start_location": self.start_location.symbol,
             "end_location": self.end_location.symbol,
+            "possible_end_locations": [x.symbol for x in self.possible_end_goods],
             "trade_symbol": self.trade_symbol,
             "distance": math.ceil(self.distance),
             "profit_per_unit": self.profit_per_unit,
@@ -89,6 +65,52 @@ class TradeOpportunity:
             "goods_produced_per_hour": self.goods_produced_per_hour,
             "cph_of_goods_produced": round(self.current_profit_ptrip_pvolume_phour, 2),
         }
+
+    def select_destination(self, destination_symbol: str):
+        for good in self.possible_end_goods:
+            if good.symbol == destination_symbol:
+                self.selected_end_good = good
+                return
+
+    def set_additional_properties(self):
+        if not self.selected_end_good:
+            return
+        if self.mode == "MANAGE":
+            supplies = {
+                "ABUNDANT": 2 + 4 + 8,
+                "HIGH": 4 + 8,
+                "MODERATE": 8,
+                "LIMITED": 0,
+                "SCARCE": 0,
+            }
+        elif self.mode == "SKIM":
+            supplies = {
+                "ABUNDANT": 2,
+                "HIGH": 0,
+                "MODERATE": 0,
+                "LIMITED": 0,
+                "SCARCE": 0,
+            }
+
+        self.end_location = self.selected_end_good.waypoint
+
+        self.distance = self._pathfinder.calc_distance_between(
+            self.start_location, self.end_location
+        )
+        self.profit_per_unit = (
+            self.selected_end_good.sell_price - self.start_good.buy_price
+        )
+        self.total_quantity = (
+            self.selected_end_good.trade_volume
+            * supplies[self.selected_end_good.supply]
+        )
+        self.goods_produced_per_hour = (
+            self.start_good.trade_volume
+            * self.activity_modifiers[self.selected_end_good.activity]
+        )
+        self.current_profit_ptrip_pvolume_phour = (
+            self.profit_per_unit * self.total_quantity / self.distance
+        )
 
 
 class TradeManager:
@@ -173,6 +195,18 @@ class TradeManager:
                             TradeOpportunity(self.client, export, imp)
                         )
         self.opportunities = opportunities
+
+    def save_opportunities(self):
+        "save the opportunities selected destination, and their mode, to file"
+        with open("resources/opportunities.json", "w+") as f:
+            f.write(self.list_opportunities_for_json())
+
+    def load_opportunities(self):
+        "load the opportunities selected destination, and their mode, from file"
+        with open("resources/opportunities.json", "r") as f:
+            data = f.read()
+
+            self.opportunities = data
 
     def claim_best_trade(
         self,
@@ -311,7 +345,5 @@ if __name__ == "__main__":
     #
     #
     tm = TradeManager(client)
-    opportunity = tm.claim_best_trade("X1-SZ74", "X1-SZ74-A1", 400, 40)
-    second_opportunity = tm.claim_best_trade("X1-SZ74", "X1-SZ74-A1", 400, 40)
     opps = tm.list_opportunities("X1-SZ74")
-    print(opportunity)
+    tm.save_opportunities()
