@@ -23,7 +23,6 @@ ST_USER = os.environ.get("ST_DB_USER", "spacetraders")
 ST_PASS = os.environ.get("ST_DB_PASSWORD", "spacetraders")
 ST_PORT = os.environ.get("ST_DB_PORT", "5432")
 
-
 api_client = SpaceTradersApiClient()
 mediator_client = SpaceTradersMediatorClient(
     db_host=ST_HOST, db_name=ST_NAME, db_user=ST_USER, db_pass=ST_PASS, db_port=ST_PORT
@@ -274,4 +273,4 @@ if token:
 
 if __name__ == "__main__":
     print("Hello, world!")
-    socketio.run(app, port=3000)
+    socketio.run(app, host="0.0.0.0", port=3000)

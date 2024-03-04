@@ -18,6 +18,11 @@ Milestone 3:
 * feed markets into trade manager and recalculate those trades only
 * when executing manually, detract from available trade value
 * auto-trade slider
+* Containerise the app
+  * ✅ get the app into a docker container
+  * ✅ get the app running and talking to the DB
+  * ✅ figure out SSH forwarding of the relevant port
+  * Get the app to run on a production server not the default
 
 Milestone 4:
 * Buy ships from UI 

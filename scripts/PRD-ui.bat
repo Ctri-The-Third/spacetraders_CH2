@@ -3,7 +3,9 @@ docker buildx build --push --platform linux/amd64,linux/arm64  -t ctriatanitan/s
 
 
 
-docker stop spacetraders_ch2_ui
-docker rm spacetraders_ch2_ui
+docker stop spacetraders_ch2_ui_container
+docker rm spacetraders_ch2_ui_container
 docker pull ctriatanitan/spacetraders_ch2_ui:latest
-docker run -d --env-file scripts\.env -p 3000:3000 --name spacetraders_ch2_ui ctriatanitan/spacetraders_ch2_ui:latest
+docker network create spacetraders
+
+docker run -d --env-file scripts\.env -p 3000:3000 --network spacetraders --name spacetraders_ch2_ui_container ctriatanitan/spacetraders_ch2_ui:latest

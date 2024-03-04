@@ -10,8 +10,11 @@ copy ./requirements.txt ./requirements.txt
 run python -m pip install -r requirements.txt
 
 workdir ..
-copy . . 
+copy *.py ./
+copy ./static ./static
+copy ./templates ./templates
 
+EXPOSE 3000
 ENV ST_DB_USER=spacetraders 
 
 cmd ["python", "main.py"]
