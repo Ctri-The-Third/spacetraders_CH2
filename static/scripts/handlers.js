@@ -18,7 +18,7 @@ socket.on("list_ships", function (data) {
         shipList.add(option);
     });
 });
-socket.on("ship_update", function (data) {
+socket.on("ship-update", function (data) {
     console.log("Ship update received: " + data);
     //if data is a dict already, assign it to the ship variable. if it's a string, json parse it.
     var ship = (typeof data === 'object') ? data : JSON.parse(data);
@@ -78,7 +78,7 @@ function rec_update_ship_object(prefix, ship_piece) {
         }
     }
 }
-socket.on("market_update", function (data) {
+socket.on("market-update", function (data) {
     console.log("Market update received: " + data);
     //if data is a dict already, assign it to the ship variable. if it's a string, json parse it.
     var market = (typeof data === 'object') ? data : JSON.parse(data);
@@ -293,21 +293,14 @@ function log_output(content) {
 
 }
 
+socket.on("ship-box", function (data) {
+    document.getElementById('selected_ship').innerHTML = data;
+});
 
-socket.on("ship-update", function (data) {
-    ship = JSON.parse(data);
-    symbol = ship.symbol;
 
-    var shipList = document.getElementById('list_of_ship_symbols');
-    if (!shipList) {
-        console.log("No shipList found");
-        return;
-    }
-    shipList.value = data;
-})
 
 socket.on("trades-update", function (data) {
-
+    console.log("trades-update: received [" + data.length + "] trades");
     div = document.getElementById('trades_output');
     if (!div) { console.log("received trades-update but no trades_output found"); return }
     for (system in data) {
@@ -352,7 +345,9 @@ socket.on("trades-update", function (data) {
             op = data[system][key];
             var newRow = table.insertRow();
             var newCell = newRow.insertCell(0);
-            text_content = "<img src='/static/icons/GOOD_" + op.trade_symbol + ".png'/>" + op.trade_symbol;
+            text_content = "<a href = '/trade/" + system + "/" + op.trade_symbol + "'>"
+            text_content += "<img src='/static/icons/GOOD_" + op.trade_symbol + ".png'/>" + op.trade_symbol;
+            text_content += "</a>";
             newCell.innerHTML = text_content;
 
             var newCell = newRow.insertCell(1);
@@ -364,11 +359,11 @@ socket.on("trades-update", function (data) {
             newCell.innerHTML = text_content;
 
             var newCell = newRow.insertCell(3);
-            text_content = op.total_quantity + " (" + op.export_tv + ")";
+            text_content = "<img src='/static/icons/" + op.supply + ".png' />" + op.total_quantity + " (" + op.export_tv + ")";
             newCell.innerHTML = text_content;
 
             var newCell = newRow.insertCell(4);
-            text_content = op.goods_produced_per_hour;
+            text_content = "<img src='/static/icons/" + op.activity + ".png' />" + op.goods_produced_per_hour;
             newCell.innerHTML = text_content;
 
             var newCell = newRow.insertCell(5);
@@ -389,10 +384,11 @@ socket.on("trades-update", function (data) {
 // This function finds all divs with the class 'timer', and sets up an interval.
 function initializeTimers() {
     // Find all timer divs
-    var timers = document.querySelectorAll('.timer');
 
     // Set up an interval that runs every 1000ms (1 second)
     setInterval(function () {
+        var timers = document.querySelectorAll('.timer');
+
         timers.forEach(function (timer) {
             // Get the current value as an integer
             var currentValue = parseInt(timer.textContent, 10);

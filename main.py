@@ -140,7 +140,23 @@ def view_trade_manager():
     ships = mediator_client.ships_view()
     params["trades"] = tm.list_opportunities_for_json()
     params["ships"] = [shf.ship_to_dict(ship) for ship in ships.values()]
-    return render_template("trade_manager.html", **params)
+    return render_template("trade_list.html", **params)
+
+
+@app.route("/trade/<system_symbol>/<trade_symbol>")
+@check_login
+def view_trade(system_symbol, trade_symbol):
+    tm = TradeManager(mediator_client)
+    trade = tm.get_opportunity_json(system_symbol, trade_symbol)
+    return render_template("trade_panel.html", system_symbol=system_symbol, trade=trade)
+
+
+@socketio.on("fetch-trade")
+@check_login
+def fetch_trade(data):
+    tm = TradeManager(mediator_client)
+    trade = tm.get_opportunity_json(data["system_symbol"], data["trade_symbol"])
+    emit("trade-update", trade)
 
 
 @socketio.on("travel")
@@ -225,17 +241,30 @@ def list_ships():
     emit("logs-response", "Done listing ships")
 
 
+@socketio.on("fetch-ship-box")
+def fetch_ship_block(data):
+    ship = mediator_client.ships_view_one(data, True)
+    emit("ship-box", render_template("ship_box.html", ship=shf.ship_to_dict(ship)))
+
+
 @socketio.on("fetch-ship")
 def fetch_ship(data):
     ship = mediator_client.ships_view_one(data, True)
-    emit("ship_update", shf.ship_to_dict(ship))
+    emit("ship-update", shf.ship_to_dict(ship))
 
 
 @socketio.on("fetch-trades")
 def fetch_trades():
     tm = TradeManager(mediator_client)
-    tm.populate_opportunities()
+    tm.update_opportunities()
     emit("trades-update", tm.list_opportunities_for_json())
+
+
+@socketio.on("fetch-trade")
+def fetch_trade(data):
+    tm = TradeManager(mediator_client)
+    trade = tm.get_opportunity_json(data["system_symbol"], data["trade_symbol"])
+    emit("trade-update", trade)
 
 
 @socketio.on("refuel")

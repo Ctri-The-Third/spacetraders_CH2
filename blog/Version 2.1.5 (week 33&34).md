@@ -14,10 +14,16 @@ Milestone 2:
 * ✅ single click to execute a trade
 
 Milestone 3: 
-* render trade panel updates to the UI 
-* feed markets into trade manager and recalculate those trades only
-* when executing manually, detract from available trade value
-* auto-trade slider
+* ✅ render trade panel updates to the UI 
+  * 🤔 for future development, I think I will switch to this approach. Load empty template and request content, so only have to impliment it once instead of twice.
+* Be able to assign behaviours to exports. (skim, skip, manage)
+  * ✅ manually in the json
+  * with a UI element
+  
+* Be able to assign destinations to exports. (Default to most profitable per distance)
+  * ✅ manually in the json
+  * with a UI element
+* ✅ when executing manually, detract from available trade value
 * Containerise the app
   * ✅ get the app into a docker container
   * ✅ get the app running and talking to the DB
@@ -25,6 +31,7 @@ Milestone 3:
   * Get the app to run on a production server not the default
 
 Milestone 4:
+* auto-trade slider
 * Buy ships from UI 
 * ✅ ships view
  

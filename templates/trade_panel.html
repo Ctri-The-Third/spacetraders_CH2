@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+
+{% include '_header.html' %}
+<span id="data_output"></span>
+<div id="trade_output">
+    <h3 id="trade_output_name">Tradegood</h3>
+    <span id="trade_output_symbol">TRADEGOOD</span> - <span id="trade_output_description">Description of the
+        tradegood</span>
+    <hr />
+    <div class="row">
+        <div class="col-sm-12 col-lg-6">
+            Source: <span id="trade_output_source_wp">source_wp</span><br />
+            Supply: <span id="trade_output_supply">supply</span><br />
+            Activity: <span id="trade_output_activity">activity</span><br />
+            Trade Volume: <span id="trade_output_trade_volume">trade_volume</span><br />
+            Produced/h: <span id="trade_output_goods_produced_per_hour">produced_per_hour</span><br />
+
+            <hr />
+            Saved data: <span id="trade_output_strategy">saved_strat</span> to <span
+                id="trade_output_end_location">saved_locatoin</span><br />
+            Strategy: <select id="trade_output_strategy_select">
+                <option value="buy" id="trade_output_strategy_skim" value="SKIM">SKIM</option>
+                <option value="sell" id="trade_output_strategy_manage" value="MANAGE">MANAGE</option>
+                <option value="sell" id="trade_output_strategy_skip" value="SKIP">SKIP</option>
+            </select>
+            Selected Location: <select id="trade_output_selected_location">
+                <option value="X1-PLACEHOLDER-A1">X1-PLACEHOLDER-A1</option>
+            </select>
+
+        </div>
+        <div class="col-sm-12 col-lg-6">
+            import details
+            <div id="trade_output_destinations">
+                <div>
+                    X1-PLACEHOLDER-B2: 1000
+                    Profit: +500 per unit
+                    Distance: 904
+                    Profit per distance: 0.55
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    trade_to_get = { "system_symbol": "{{system_symbol}}", "trade_symbol": "{{trade.trade_symbol}}" };
+    socket.emit('fetch-trade', trade_to_get);
+</script>
+
+<script>
+    function update_trade(data) {
+        console.log("updating trade - received data " + data)
+        document.getElementById('trade_output_symbol').innerHTML = data.trade_symbol;
+        document.getElementById('trade_output_name').innerHTML = data.friendly_name;
+        document.getElementById('trade_output_description').innerHTML = data.description;
+        document.getElementById('trade_output_source_wp').innerHTML = data.start_location;
+        document.getElementById('trade_output_supply').innerHTML = data.supply;
+        document.getElementById('trade_output_activity').innerHTML = data.activity;
+        document.getElementById('trade_output_trade_volume').innerHTML = data.export_tv;
+        document.getElementById('trade_output_goods_produced_per_hour').innerHTML = data.goods_produced_per_hour;
+        document.getElementById('trade_output_strategy').innerHTML = data.strategy;
+        document.getElementById('trade_output_end_location').innerHTML = data.end_location;
+        //document.getElementById('trade_output_destinations').innerHTML = data.destinations;
+        possible_locations = data.possible_locations;
+        output_div = document.getElementById('trade_output_destinations');
+        output_div.innerHTML = "";
+        for (var key in possible_locations) {
+            var new_div = document.createElement("div");
+            var text = "<b>" + key + "</b>: profit/unit" + possible_locations[key].profit_per_unit + "<br/>"
+            text += "distance: " + possible_locations[key].distance + ", profit per distance: " + possible_locations[key].profit_per_distance + "<br/>"
+            new_div.innerHTML += text;
+            output_div.appendChild(new_div);
+        }
+    }
+    socket.on("trade-update", function (data) {
+        update_trade(data);
+    });
+</script>

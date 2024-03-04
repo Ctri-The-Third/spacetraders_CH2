@@ -10,7 +10,7 @@ All ships belonging to {{agent.symbol}}, <span id="agent_output_credits">{{agent
     <div class="row">
 
         {% for ship in ships %}
-        <div class=" col-lg-2 col-md-4 col-sm-6  ship-box" id={{ship.symbol}}>
+        <div class=" col-lg-2 col-md-4 col-sm-6  mx-2 ship-box" id={{ship.symbol}}>
             <a href="ships/{{ship.symbol}}"
                 onclick="window.open('ships/{{ship.symbol}}','{{ship.symbol}}','menubar=no,toolbar=no, width=400, height=800'); return false;">
                 [{{ ship.symbol }}] <div style="text-align:right; float:right;">[{{ ship.registration.emoji }}

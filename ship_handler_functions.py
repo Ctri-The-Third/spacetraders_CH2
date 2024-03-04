@@ -15,24 +15,33 @@ import trademanager
 locker = ShipLocker()
 
 
-def intrasolar_travel(client: SpaceTradersMediatorClient, ship_id: str, waypoint: str):
-    if not locker.lock_ship(ship_id, threading.current_thread().ident, 3600):
-        send(f"Unable to lock {ship_id} for intrasolar travel")
+def intrasolar_travel(
+    client: SpaceTradersMediatorClient, ship_name: str, waypoint: str
+):
+    if not locker.lock_ship(ship_name, 3600):
+        send(
+            f"Unable to lock {ship_name} for intrasolar travel, expires in {locker.when_does_lock_expire(ship_name)} seconds"
+        )
+
         return
-    ship = client.ships_view_one(ship_id)
+    ship = client.ships_view_one(ship_name)
     destination = client.waypoints_view_one(waypoint)
     pf = PathFinder(client)
     if not ship:
         send(f"Ship not found - {ship.error_code}")
+        locker.unlock_early(ship_name)
         return
     origin = client.waypoints_view_one(ship.nav.waypoint_symbol)
 
     if not destination:
         send(f"Destination not found - {destination.error_code}")
+        locker.unlock_early(ship_name)
+
         return
 
     if ship.nav.waypoint_symbol == waypoint:
         send("Already at destination")
+        locker.unlock_early(ship_name)
         return
 
     distance = pf.calc_distance_between(origin, destination)
@@ -45,13 +54,15 @@ def intrasolar_travel(client: SpaceTradersMediatorClient, ship_id: str, waypoint
 
     elif distance < ship.fuel_capacity:
         send(
-            f"Single hop route - {distance}u, {travel_time} refueling then going direct"
+            f"Single hop route - {distance}u, {travel_time}s refueling then going direct"
         )
 
-        refuel(client, ship_id)
+        refuel(client, ship_name)
+        client.ship_orbit(ship)
         _travel_hop(client, ship, waypoint)
     else:
         send("Multi-hop route")
+    locker.unlock_early(ship_name)
 
 
 def _travel_hop(client, ship, waypoint):
@@ -65,7 +76,7 @@ def _travel_hop(client, ship, waypoint):
         send(f"Error moving ship - {resp.error_code}")
         return
     send(f"Ship en route, sleeping for {ship.nav.travel_time_remaining} seconds")
-    emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("ship-update", ship_to_dict(ship), broadcast=True)
     time.sleep(ship.nav.travel_time_remaining + 1)
 
     ship.nav.status = "ORBIT"
@@ -73,7 +84,7 @@ def _travel_hop(client, ship, waypoint):
     client.update(ship)
     send("Ship arrived")
     arrive_at_wayp_and_emit(client, waypoint)
-    emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("ship-update", ship_to_dict(ship), broadcast=True)
 
 
 def arrive_at_wayp_and_emit(client: SpaceTradersMediatorClient, waypoint_sym: str):
@@ -91,21 +102,24 @@ def arrive_at_wayp_and_emit(client: SpaceTradersMediatorClient, waypoint_sym: st
         ].recorded_ts > timedelta(minutes=15):
             market = client.system_market(current_waypoint, True)
         market_data = market_to_dict(market)
-        emit("market_update", market_data)
+        emit("market-update", market_data)
     if current_waypoint.has_shipyard:
         shipyard = client.system_shipyard(current_waypoint)
         emit("shipyard_update", shipyard_to_dict(shipyard))
 
 
 def buy(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity: int):
-    if not locker.lock_ship(ship_name, threading.current_thread().ident, 3600):
-        send(f"Unable to lock {ship_name} for cargo buying")
+    if not locker.lock_ship(ship_name, 3600):
+        send(
+            f"Unable to lock {ship_name} for cargo buying, expires in {locker.when_does_lock_expire(ship_name)} seconds"
+        )
         return
     quantity = math.ceil(float(quantity))
 
     ship = client.ships_view_one(ship_name)
     if not ship:
         send(f"Ship not found - {ship.error_code}")
+        locker.unlock_early(ship_name)
         return
     if ship.nav.status != "DOCKED":
         client.ship_dock(ship)
@@ -113,40 +127,49 @@ def buy(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity:
         quantity = ship.cargo_space_remaining
     market = client.system_market(client.waypoints_view_one(ship.nav.waypoint_symbol))
     market: straders_sdk.models.Market
-    tg = market.get_tradegood(good)
+    if not market:
+        send(f"Market not found - {market.error_code}")
+        locker.unlock_early(ship_name)
+        return
+    tg = market.get_tradegood_listing(good)
     if not hasattr(tg, "trade_volume"):
         market = client.system_market(
             client.waypoints_view_one(ship.nav.waypoint_symbol), True
         )
-        tg = market.get_tradegood(good)
+        tg = market.get_tradegood_listing(good)
     goods_to_buy = min(quantity, ship.cargo_space_remaining)
     if not tg:
         send(f"Trade good not found - {good}")
+        locker.unlock_early(ship_name)
         return
     tv = tg.trade_volume
     for i in range(math.ceil(goods_to_buy / tv)):
         resp = client.ship_purchase_cargo(ship, tg.symbol, min(tv, goods_to_buy))
         if not resp:
             send(f"Error buying {tg.symbol} - {resp.error_code}")
-            emit("ship_update", ship_to_dict(ship), broadcast=True)
+            emit("ship-update", ship_to_dict(ship), broadcast=True)
             emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
             return
         goods_to_buy -= tv
         if goods_to_buy <= 0:
             break
     log_market_changes(client, ship.nav.waypoint_symbol)
-    emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("ship-update", ship_to_dict(ship), broadcast=True)
     emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
+    locker.unlock_early(ship_name)
 
 
 def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity: int):
-    if not locker.lock_ship(ship_name, threading.current_thread().ident, 3600):
-        send(f"Unable to lock {ship_name} for cargo buying")
+    if not locker.lock_ship(ship_name, 3600):
+        send(
+            f"Unable to lock {ship_name} for cargo selling, expires in {locker.when_does_lock_expire(ship_name)} seconds"
+        )
         return
     quantity = math.ceil(float(quantity))
     ship = client.ships_view_one(ship_name)
     if not ship:
         send(f"Ship not found - {ship.error_code}")
+        locker.unlock_early(ship_name)
         return
     found_cargo_item = None
     for c in ship.cargo_inventory:
@@ -156,6 +179,7 @@ def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity
 
     if not found_cargo_item:
         send(f"Ship doesn't have {good} in cargo")
+        locker.unlock_early(ship_name)
         return
     if ship.nav.status != "DOCKED":
         client.ship_dock(ship)
@@ -164,9 +188,10 @@ def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity
 
     market = client.system_market(waypoint)
     market: straders_sdk.models.Market
-    tg = market.get_tradegood(good)
+    tg = market.get_tradegood_listing(good)
     if not tg:
         send(f"Trade good not found - {good}")
+        locker.unlock_early(ship_name)
         return
     if quantity == 0 or quantity > found_cargo_item.units:
         quantity = found_cargo_item.units
@@ -177,8 +202,9 @@ def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity
         resp = client.ship_sell(ship, tg.symbol, amount_to_sell)
         if not resp:
             send(f"Error selling {tg.symbol} - {resp.error_code}")
-            emit("ship_update", ship_to_dict(ship), broadcast=True)
+            emit("ship-update", ship_to_dict(ship), broadcast=True)
             emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
+            locker.unlock_early(ship_name)
             return
         send(f"Sold {amount_to_sell} of {tg.symbol} for {tv * tg.sell_price} credits")
 
@@ -187,8 +213,9 @@ def sell(client: SpaceTradersMediatorClient, ship_name: str, good: str, quantity
             break
     log_market_changes(client, ship.nav.waypoint_symbol)
     ship = client.ships_view_one(ship_name)
-    emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("ship-update", ship_to_dict(ship), broadcast=True)
     emit("agent_update", agent_to_dict(client.view_my_self()), broadcast=True)
+    locker.unlock_early(ship_name)
 
 
 def execute_trade(
@@ -199,15 +226,22 @@ def execute_trade(
     end_location: str,
     quantity: int,
 ):
+    ship = client.ships_view_one(ship_name)
     tm = trademanager.TradeManager(client)
+    quantity = min(math.ceil(float(quantity)), ship.cargo_space_remaining)
+
     tm.claim_trade(trade_symbol, start_location, end_location, quantity)
     emit("trades-update", tm.list_opportunities_for_json())
     intrasolar_travel(client, ship_name, start_location)
     buy(client, ship_name, trade_symbol, quantity)
+    emit("trades-update", tm.list_opportunities_for_json())
     intrasolar_travel(client, ship_name, end_location)
     sell(client, ship_name, trade_symbol, quantity)
     # need to instruct the
     send("Trade complete")
+    emit("trades-update", tm.list_opportunities_for_json())
+
+    locker.unlock_early(ship_name)
 
 
 def refuel(client: SpaceTradersMediatorClient, ship_name: str):
@@ -221,10 +255,10 @@ def refuel(client: SpaceTradersMediatorClient, ship_name: str):
     resp = client.ship_refuel(ship)
     if not resp:
         send(f"Error refueling ship - {resp.error_code}")
-        emit("ship_update", ship_to_dict(ship), broadcast=True)
+        emit("ship-update", ship_to_dict(ship), broadcast=True)
         return
     send("Ship refueled")
-    emit("ship_update", ship_to_dict(ship), broadcast=True)
+    emit("ship-update", ship_to_dict(ship), broadcast=True)
 
 
 def log_market_changes(client: SpaceTradersMediatorClient, market_s: str):
@@ -233,11 +267,14 @@ def log_market_changes(client: SpaceTradersMediatorClient, market_s: str):
     pre_market = client.system_market(wp)
     pre_market: straders_sdk.models.Market
     post_market = client.system_market(wp, True)
+    tm = trademanager.TradeManager(client)
+    tm.update_market(post_market)
     post_market: straders_sdk.models.Market
-    emit("market_update", market_to_dict(post_market), broadcast=True)
+    emit("trades-update", tm.list_opportunities_for_json())
+    emit("market-update", market_to_dict(post_market), broadcast=True)
     for t in pre_market.listings:
         changes = {}
-        nt = post_market.get_tradegood(t.symbol)
+        nt = post_market.get_tradegood_listing(t.symbol)
         if not isinstance(nt, straders_sdk.models.MarketTradeGoodListing):
             continue
 
