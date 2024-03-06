@@ -2,6 +2,8 @@
 <html lang="en">
 
 {% include '_header.html' %}
+{% include 'top_menu.html' %}
+
 <h1>{{ship.symbol}} <a onclick="socket.emit('fetch-ship','{{ship.symbol}}');return false;">🔃</a>
 </h1>
 <input type="hidden" id="active_ship" value="{{ship.symbol}}" />

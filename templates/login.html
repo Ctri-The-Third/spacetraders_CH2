@@ -5,11 +5,20 @@
         <input type="text" name="agent_name" id="agent_name" placeholder="Agent Name" value="{{agent_name}}" />
     </div>
     <div>
-        <label for="agent_token">Agent Token</label>
-        <textarea name="agent_token" id="agent_token" placeholder="Agent Token">{{token}}</textarea>
+        <label for="faction_symbol">Desired faction</label>
+        <select>
+            {% for faction in factions %}
+            <option value="{{faction.symbol}}">{{faction.name}}</option>
+            {% endfor %}
+        </select>
+        <hr />
+        or:
+        <div>
+            <label for="agent_token">Agent Token</label>
+            <textarea name="agent_token" id="agent_token" placeholder="Agent Token">{{token}}</textarea>
 
-    </div>
-    <input type="submit" value="Login" />
+        </div>
+        <input type="submit" value="Register/Login" />
 
 
 </form>

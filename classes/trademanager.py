@@ -49,6 +49,8 @@ class TradeOpportunity:
         }
         if selected_destination:
             self.select_destination(selected_destination)
+        else:
+            self.select_closest_destination()
 
     def __repr__(self) -> str:
         return f"{self.trade_symbol}: {self.start_location.symbol} -> {self.end_location.symbol}"
@@ -85,31 +87,60 @@ class TradeOpportunity:
                 self.end_location = good.waypoint
                 return
 
+    def select_closest_destination(self):
+        # self._pathfinder.calc_distance_between(self.start_location, self.end_location)
+        if not self.possible_end_goods:
+            return
+        closest = self.possible_end_goods[0]
+        best_distance = float("inf")
+        for good in self.possible_end_goods:
+            distance = self._pathfinder.calc_distance_between(
+                self.start_location, good.waypoint
+            )
+            if distance < best_distance:
+                best_distance = distance
+                closest = good
+        self.selected_end_good = closest
+        self.end_location = closest.waypoint
+
     def set_additional_properties(self):
         if not self.selected_end_good:
             return
-        if self.strategy == "MANAGE":
+        if self.strategy == "MANAGE" and self.start_good.activity != "STRONG":
             supplies = {
-                "ABUNDANT": 2 + 4 + 8,
-                "HIGH": 4 + 8,
-                "MODERATE": 8,
+                "ABUNDANT": 5,  # at minimum 1, at max 5?
+                "HIGH": 3,  # got 2 this time
+                "MODERATE": 1,  # got 4 this time
+                "LIMITED": 0,
+                "SCARCE": 0,
+                "UNKNOWN": 1,
+            }
+        elif self.strategy == "MANAGE":
+            supplies = {
+                "ABUNDANT": 5,
+                "HIGH": 1,
+                "MODERATE": 0,
                 "LIMITED": 0,
                 "SCARCE": 0,
                 "UNKNOWN": 1,
             }
         elif self.strategy == "SKIM":
             supplies = {
-                "ABUNDANT": 2,
+                "ABUNDANT": 3,
                 "HIGH": 0,
                 "MODERATE": 0,
                 "LIMITED": 0,
                 "SCARCE": 0,
                 "UNKNOWN": 1,
             }
-
+        self.export_tv = self.start_good.trade_volume
         self.end_location = self.selected_end_good.waypoint
         self.total_quantity = (
             self.start_good.trade_volume * supplies[self.start_good.supply]
+        )
+        self.goods_produced_per_hour = (
+            self.activity_modifiers[self.start_good.activity]
+            * self.start_good.trade_volume
         )
         self.distance = self._pathfinder.calc_distance_between(
             self.start_location, self.end_location
@@ -123,10 +154,13 @@ class TradeOpportunity:
             self.selected_end_good.sell_price - self.start_good.buy_price
         )
 
-        self.goods_produced_per_hour = (
-            self.start_good.trade_volume
-            * self.activity_modifiers[self.selected_end_good.activity]
-        )
+        if self.selected_end_good.type != "EXCHANGE":
+            self.goods_produced_per_hour = (
+                self.start_good.trade_volume
+                * self.activity_modifiers[self.selected_end_good.activity]
+            )
+        else:
+            self.goods_produced_per_hour = 0
         self.current_profit_ptrip_pvolume_phour = (
             self.profit_per_unit * self.total_quantity / self.distance
         )
@@ -162,7 +196,7 @@ class TradeManager:
         waypoints = client.waypoints_view(hq_sys.symbol)
         opportunities = {}
         for waypoint in waypoints.values():
-            if "ASTEROID" not in waypoint.type and len(waypoint.traits) == 0:
+            if waypoint.type != "ASTEROID" and len(waypoint.traits) == 0:
                 client.waypoints_view_one(waypoint.symbol, True)
 
         systems = {hq_sys.symbol: {}}
@@ -239,11 +273,12 @@ class TradeManager:
             matching_tgl = market.get_tradegood_listing(opportunity.trade_symbol)
             if not matching_tg:
                 continue
-            # are we updating the source, or a destination?
+
             if opportunity.start_location.symbol == market.symbol:
                 opportunity.start_good = TradeGood(
                     opportunity.start_location, matching_tg, "EXPORT", matching_tgl
                 )
+                opportunity.set_additional_properties()
             else:
                 for end_good in opportunity.possible_end_goods:
                     if end_good.waypoint.symbol == market.symbol:
@@ -251,8 +286,8 @@ class TradeManager:
                             end_good.waypoint, matching_tg, end_good.type, matching_tgl
                         )
 
+                        opportunity.update_prices()
                         break
-            opportunity.update_prices()
 
     def load_opportunities(self):
         "load the opportunities selected destination, and their strategy, from file"
@@ -277,6 +312,17 @@ class TradeManager:
         except FileNotFoundError:
             self.save_opportunities()
 
+    def update_strategy(
+        self, system_symbol: str, trade_symbol: str, end_location: str, strategy: str
+    ):
+        matched_o = self.find_opportunity(system_symbol, trade_symbol)
+        if not matched_o:
+            return
+        matched_o: TradeOpportunity
+        matched_o.select_destination(end_location)
+        matched_o.strategy = strategy
+        self.save_opportunities()
+
     def find_opportunity(self, system_str, export_str):
         for opportunity in self.opportunities[system_str]:
             if opportunity.trade_symbol == export_str:
@@ -287,7 +333,7 @@ class TradeManager:
         with open("resources/opportunities.json", "w+") as f:
             f.write(json.dumps(self.list_opportunities_for_json(), indent=2))
 
-    def claim_best_trade(
+    def pick_best_trade(
         self,
         system_symbol: str,
         start_location: str,
@@ -299,7 +345,10 @@ class TradeManager:
         start_waypoint = self.client.waypoints_view_one(start_location)
         valid_opportunities = []
         for opportunity in local_opportunities:
+            opportunity: TradeOpportunity
             if opportunity.distance > max_distance:
+                continue
+            if opportunity.profit_per_unit < 0:
                 continue
             total_distance = (
                 self._pathfinder.calc_distance_between(
@@ -307,17 +356,17 @@ class TradeManager:
                 )
                 + opportunity.distance
             )
-            potential_quantity = min(opportunity.total_quantity, ship_cargo_capacity)
-            score = (opportunity.profit_per_unit * potential_quantity) / total_distance
+            potential_quantity = min(
+                max(opportunity.total_quantity, 1), ship_cargo_capacity
+            )
+            score = (opportunity.profit_per_unit * potential_quantity) / max(
+                total_distance, 1
+            )
             valid_opportunities.append((score, opportunity))
 
         valid_opportunities.sort(key=lambda x: x[0], reverse=True)
         if valid_opportunities:
             best_opp = valid_opportunities[0][1]
-
-            self.opportunities[system_symbol].remove(best_opp)
-            best_opp.total_quantity -= ship_cargo_capacity
-            self.opportunities[system_symbol].append(best_opp)
             return best_opp
 
         # we need to reduce the total quantity by the amount of cargo we have
@@ -334,7 +383,7 @@ class TradeManager:
                 return_obj["manufactured_by"] = st_const.MANUFACTURED_BY.get(
                     tg.symbol, []
                 )
-                return_obj["ingredient_for"] = st_const.MANUFACTURES.get(tg.symbol, [])
+                return_obj["manufactures"] = st_const.MANUFACTURES.get(tg.symbol, [])
                 return_obj["possible_locations"] = {}
                 for end_good in opportunity.possible_end_goods:
                     return_obj["possible_locations"][end_good.waypoint.symbol] = {
@@ -346,6 +395,7 @@ class TradeManager:
                         "profit_per_distance": (end_good.sell_price - tg.buy_price)
                         / max(opportunity.distance, 1),
                     }
+
                 return return_obj
         return {}
 

@@ -117,6 +117,11 @@ label {
     text-align: center;
 }
 
+a.nav-link {
+    background-color: #333;
+    color: #7f7;
+}
+
 .section-title {
     font-size: 14px;
     font-weight: bold;

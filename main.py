@@ -6,12 +6,12 @@ import straders_sdk.clients, straders_sdk.models
 import os
 from straders_sdk.clients import SpaceTradersApiClient, SpaceTradersMediatorClient
 from straders_sdk.responses import RemoteSpaceTradersRespose
-import ship_handler_functions as shf
+import classes.ship_handler_functions
 import time, json
-from straders_sdk.utils import waypoint_to_system
-
-from trademanager import TradeManager, TradeOpportunity
-
+from straders_sdk.utils import waypoint_to_system, waypoint_suffix
+from classes.ship_handler_functions import ShipHandler
+from classes.trademanager import TradeManager, TradeOpportunity
+from classes.trade_autopilot import TradeAutoPilot
 
 app = Flask("C'tri's SpaceTraders Client")
 app.config["SECRET_KEY"] = "notreallythatsecret"
@@ -27,6 +27,7 @@ api_client = SpaceTradersApiClient()
 mediator_client = SpaceTradersMediatorClient(
     db_host=ST_HOST, db_name=ST_NAME, db_user=ST_USER, db_pass=ST_PASS, db_port=ST_PORT
 )
+shf = ShipHandler(mediator_client, socketio)
 
 
 def emit_response(raw_response):
@@ -66,12 +67,14 @@ def check_login(route):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     params = {}
+    params["factions"] = [f for f in mediator_client.list_factions() if f.is_recruiting]
 
     if request.method == "POST":
         token = request.form.get("agent_token", "")
         params["token"] = token
         agent_name = request.form.get("agent_name")
         params["agent_name"] = agent_name
+
         success = False
         if token:
             with open("token.secret", "w") as f:
@@ -84,6 +87,7 @@ def login():
             if resp:
                 with open("token.secret", "w+") as f:
                     f.write(api_client.token)
+                    token = api_client.token
                     success = True
             else:
                 params["error"] = "Failed to register"
@@ -151,12 +155,19 @@ def view_trade(system_symbol, trade_symbol):
     return render_template("trade_panel.html", system_symbol=system_symbol, trade=trade)
 
 
-@socketio.on("fetch-trade")
+@socketio.on("save-trade-strategy")
 @check_login
-def fetch_trade(data):
+def save_trade_strategy(data):
     tm = TradeManager(mediator_client)
-    trade = tm.get_opportunity_json(data["system_symbol"], data["trade_symbol"])
-    emit("trade-update", trade)
+    tm.update_strategy(
+        data["system_symbol"],
+        data["trade_symbol"],
+        data["end_location"],
+        data["strategy"],
+    )
+    emit("logs-response", "Trade strategy saved")
+
+    fetch_trade(data)
 
 
 @socketio.on("travel")
@@ -164,7 +175,7 @@ def travel(data):
     # get the ship ID from the data, and the destination
     ship_id = data.get("ship_name")
     destination = data.get("destination")
-    shf.intrasolar_travel(mediator_client, ship_id, destination)
+    shf.intrasolar_travel(ship_id, destination)
 
 
 @socketio.on("buy")
@@ -172,7 +183,7 @@ def buy(data):
     ship_id = data.get("ship_name")
     good = data.get("good")
     quantity = data.get("quantity", 0)
-    shf.buy(mediator_client, ship_id, good, quantity)
+    shf.buy(ship_id, good, quantity)
 
 
 @socketio.on("sell")
@@ -180,7 +191,7 @@ def sell(data):
     ship_id = data.get("ship_name")
     good = data.get("good")
     quantity = data.get("quantity", 0)
-    shf.sell(mediator_client, ship_id, good, quantity)
+    shf.sell(ship_id, good, quantity)
 
 
 @socketio.on("fetch-markets")
@@ -203,9 +214,12 @@ def execute_trade(data):
     start_location = data.get("start_location")
     end_location = data.get("end_location")
     quantity = data.get("quantity", 0)
-    shf.execute_trade(
-        mediator_client, ship_id, trade_symbol, start_location, end_location, quantity
-    )
+    shf.execute_trade(ship_id, trade_symbol, start_location, end_location, quantity)
+
+
+@socketio.on("execute-best-trade")
+def execute_best_trade(data):
+    shf.execute_best_trade(data)
 
 
 @socketio.on("fetch-market")
@@ -272,7 +286,22 @@ def fetch_trade(data):
 def refuel(data):
     ship_name = data.get("ship_name")
     # call the refuel function
-    shf.refuel(mediator_client, ship_name)
+    shf.refuel(ship_name)
+
+
+@socketio.on("toggle-autopilot")
+def toggle_autopilot(ship_id):
+
+    tap = TradeAutoPilot(shf)
+    is_locked = tap.toggle_ship(ship_id)
+    emit("autopilot-update", {"ship_id": ship_id, "is_locked": is_locked})
+
+
+@socketio.on("fetch-ship-autopilotstate")
+def fetch_ship_autopilotstate(ship_id):
+    tap = TradeAutoPilot(shf)
+    is_locked = tap.is_ship_autopiloting(ship_id)
+    emit("autopilot-update", {"ship_id": ship_id, "is_locked": is_locked})
 
 
 @socketio.on("connect")

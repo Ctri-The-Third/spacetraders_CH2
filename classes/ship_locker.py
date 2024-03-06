@@ -1,7 +1,6 @@
 # import the mutex lock
-from threading import Lock
+from threading import Lock, current_thread
 from datetime import datetime, timedelta
-import logging
 
 
 class ShipLocker:
@@ -14,13 +13,12 @@ class ShipLocker:
         return self.instance
 
     def __init__(self):
-        if hasattr(self, "lock"):
-            return
         self._ships = {}
         self.lock = Lock()
-        self.logger = logging.getLogger(__name__)
 
-    def lock_ship(self, ship_name: str, lock_id: str, lock_duration: int):
+    def lock_ship(self, ship_name: str, lock_duration: int, lock_id: str = None):
+        if not lock_id:
+            lock_id = current_thread().ident
         with self.lock:
             if ship_name not in self._ships:
                 self._ships[ship_name] = None
@@ -51,9 +49,24 @@ class ShipLocker:
             else:
                 return False
 
-    def unlock_early(self, ship_name: str, lock_id: str):
+    def when_does_lock_expire(self, ship_name: str) -> int:
         with self.lock:
             if ship_name in self._ships:
+                lock = self._ships[ship_name]
+                if lock:
+                    return lock.seconds_remaining
+                else:
+                    self._ships[ship_name] = None
+                    return 0
+            else:
+                return None
+
+    def unlock_early(self, ship_name: str, lock_id: str = None):
+        if not lock_id:
+            lock_id = current_thread().ident
+        with self.lock:
+            if ship_name in self._ships and self._ships[ship_name]:
+
                 if self._ships[ship_name].lock_id == lock_id:
                     self._ships[ship_name] = None
                     return True

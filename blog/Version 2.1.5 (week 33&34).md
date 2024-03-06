@@ -16,25 +16,28 @@ Milestone 2:
 Milestone 3: 
 * ✅ render trade panel updates to the UI 
   * 🤔 for future development, I think I will switch to this approach. Load empty template and request content, so only have to impliment it once instead of twice.
-* Be able to assign behaviours to exports. (skim, skip, manage)
+* ✅ Be able to assign behaviours to exports. (skim, skip, manage)
   * ✅ manually in the json
-  * with a UI element
-  
-* Be able to assign destinations to exports. (Default to most profitable per distance)
+  * ✅ with a UI element
+* format credit numbers like so: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/toLocaleString
+* ✅ Be able to assign destinations to exports. (Default to most profitable per distance)
   * ✅ manually in the json
-  * with a UI element
+  * ✅ with a UI element
 * ✅ when executing manually, detract from available trade value
-* Containerise the app
+
+Milestone 4: ☑️
+* ✅ Add factions to login page
+* ✅ Make a menu bar
+* ✅ auto-trade slider
+* Buy ships from UI 
+* ✅ ships view
+* ✅ Containerise the app
   * ✅ get the app into a docker container
   * ✅ get the app running and talking to the DB
   * ✅ figure out SSH forwarding of the relevant port
-  * Get the app to run on a production server not the default
+  * ✅ Get the app to run on a production server not the default
 
-Milestone 4:
-* auto-trade slider
-* Buy ships from UI 
-* ✅ ships view
- 
+
 Goals we didn't know we had
 * ✅ Restructure the SDK so that clients, models, and responses are all in their own sub-packages, instead of spread out as they are presently.
 * ✅ Fix the market object so that it properly renders the tradegoods that aren't listings.

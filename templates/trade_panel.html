@@ -2,11 +2,15 @@
 <html lang="en">
 
 {% include '_header.html' %}
+{% include 'top_menu.html' %}
+
 <span id="data_output"></span>
 <div id="trade_output">
     <h3 id="trade_output_name">Tradegood</h3>
     <span id="trade_output_symbol">TRADEGOOD</span> - <span id="trade_output_description">Description of the
-        tradegood</span>
+        tradegood</span><br />
+    Manufactured by <span id="trade_output_manufactured_by">TRADEGOOD</span>, and used to manufacture<span
+        id="trade_output_manufactures"></span><br />
     <hr />
     <div class="row">
         <div class="col-sm-12 col-lg-6">
@@ -19,12 +23,12 @@
             <hr />
             Saved data: <span id="trade_output_strategy">saved_strat</span> to <span
                 id="trade_output_end_location">saved_locatoin</span><br />
-            Strategy: <select id="trade_output_strategy_select">
-                <option value="buy" id="trade_output_strategy_skim" value="SKIM">SKIM</option>
-                <option value="sell" id="trade_output_strategy_manage" value="MANAGE">MANAGE</option>
-                <option value="sell" id="trade_output_strategy_skip" value="SKIP">SKIP</option>
+            Strategy: <select id="trade_output_strategy_select" onchange="save_strategy()">
+                <option value="SKIM" id="trade_output_strategy_skim" value="SKIM">SKIM</option>
+                <option value="MANAGE" id="trade_output_strategy_manage" value="MANAGE">MANAGE</option>
+                <option value="SKIP" id="trade_output_strategy_skip" value="SKIP">SKIP</option>
             </select>
-            Selected Location: <select id="trade_output_selected_location">
+            Selected Location: <select id="trade_output_selected_location" onchange="save_strategy()">
                 <option value="X1-PLACEHOLDER-A1">X1-PLACEHOLDER-A1</option>
             </select>
 
@@ -49,7 +53,13 @@
     trade_to_get = { "system_symbol": "{{system_symbol}}", "trade_symbol": "{{trade.trade_symbol}}" };
     socket.emit('fetch-trade', trade_to_get);
 </script>
-
+<script>
+    function save_strategy() {
+        trade_to_get.strategy = document.getElementById('trade_output_strategy_select').value;
+        trade_to_get.end_location = document.getElementById('trade_output_selected_location').value;
+        socket.emit('save-trade-strategy', trade_to_get);
+    }
+</script>
 <script>
     function update_trade(data) {
         console.log("updating trade - received data " + data)
@@ -63,17 +73,36 @@
         document.getElementById('trade_output_goods_produced_per_hour').innerHTML = data.goods_produced_per_hour;
         document.getElementById('trade_output_strategy').innerHTML = data.strategy;
         document.getElementById('trade_output_end_location').innerHTML = data.end_location;
+
+        document.getElementById('trade_output_manufactured_by').innerHTML = data.manufactured_by.join(", ");
+        document.getElementById('trade_output_manufactures').innerHTML = data.manufactures.join(", ");
         //document.getElementById('trade_output_destinations').innerHTML = data.destinations;
         possible_locations = data.possible_locations;
         output_div = document.getElementById('trade_output_destinations');
+        select = document.getElementById('trade_output_selected_location');
+        select.innerHTML = "";
         output_div.innerHTML = "";
+
+        select.innerHTML = "<option>select location</option>";
         for (var key in possible_locations) {
             var new_div = document.createElement("div");
             var text = "<b>" + key + "</b>: profit/unit" + possible_locations[key].profit_per_unit + "<br/>"
             text += "distance: " + possible_locations[key].distance + ", profit per distance: " + possible_locations[key].profit_per_distance + "<br/>"
             new_div.innerHTML += text;
             output_div.appendChild(new_div);
+
+            var new_option = document.createElement("option");
+            new_option.value = key;
+            if (key == data.end_location) {
+                new_option.selected = true;
+            }
+            new_option.innerHTML = key;
+            select.appendChild(new_option);
         }
+
+        strategy_select = document.getElementById('trade_output_strategy_select');
+        strategy_select.value = data.strategy;
+
     }
     socket.on("trade-update", function (data) {
         update_trade(data);
