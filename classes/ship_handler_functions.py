@@ -390,11 +390,12 @@ def market_to_dict(market: straders_sdk.models.Market):
 
 
 def shipyard_to_dict(shipyard: straders_sdk.models.Shipyard):
-    return {}
+
+    return {shipyard.to_json()}
 
 
 def waypoint_to_dict(waypoint: straders_sdk.models.Waypoint):
-    return {}
+    return waypoint.to_json()
 
 
 def construction_to_dict(construction: straders_sdk.models.ConstructionSite):

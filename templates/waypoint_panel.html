@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+
+{% include '_header.html' %}
+{% include 'top_menu.html' %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-4 col-md-6 col-sm-12 " style="border:1px solid red;">
+            <h1 id="waypoint_output_symbol">X1-TEST-A1</h1>
+            <span id="waypoint_output_type">PLANET</span> in <span id="waypoint_output_systemSymbol">X1-TEST</span> at
+            <span id="waypoint_output_x">0</span>, <span id="waypoint_output_y">0</span>.
+            <span id="waypoint_output_isUnderConstruction"></span>
+            <br />
+            Orbitals: <br />
+            <ul id="waypoint_output_orbitals">
+                <li id="waypoint_output_orbitals_0">string</li>
+            </ul>
+            <h3>Traits</h3>
+            <ul id="waypoint_output_traits">
+                <li id="waypoint_output_traits_0" data-toggle="tooltip" data-placement="top"
+                    title="Modifier description">
+                </li>
+                modifier name</li>
+            </ul>
+
+            <hr />
+        </div>
+        <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
+            <h3>Marketplace</h3>
+
+            <hr />
+        </div>
+        <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
+            <h3>Shipyard</h3>
+
+            <hr />
+        </div>
+        <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
+            <h3>Construction site</h3>
+
+            <hr />
+        </div>
+    </div>
+</div>
+
+<script>
+    function update_waypoint(data) {
+        console.log(data)
+        document.getElementById('waypoint_output_symbol').innerText = data.symbol;
+        document.getElementById('waypoint_output_type').innerText = data.type;
+        document.getElementById('waypoint_output_systemSymbol').innerText = data.systemSymbol;
+        document.getElementById('waypoint_output_x').innerText = data.x;
+        document.getElementById('waypoint_output_y').innerText = data.y;
+        document.getElementById('waypoint_output_isUnderConstruction').innerText = data.isUnderConstruction ? "This waypoint is under construction" : "";
+        //document.getElementById('waypoint_output_faction_symbol').innerText = data.faction.symbol;
+        document.getElementById('waypoint_output_orbitals').innerHTML = "";
+
+        if (data.orbitals.length == 0) {
+            document.getElementById('waypoint_output_orbitals').innerHTML = "<li>None</li>";
+        }
+        else {
+            for (let i = 0; i < data.orbitals.length; i++) {
+                document.getElementById('waypoint_output_orbitals').innerHTML += "<li>"
+                    + "<a href='/waypoints/" + data.orbitals[i].symbol + "'>"
+                    + data.orbitals[i].symbol
+                    + "</a></li>";
+            }
+        }
+        document.getElementById('waypoint_output_traits').innerHTML = "";
+        for (let i = 0; i < data.traits.length; i++) {
+            document.getElementById('waypoint_output_traits').innerHTML += "<li>"
+                + data.traits[i].name + ": " + data.traits[i].description
+                + "</li>";
+        }
+        for (let i = 0; i < data.modifiers.length; i++) {
+            document.getElementById('waypoint_output_traits').innerHTML += "<li>" + data.modifiers[i].name + ": " + data.modifiers[i].description + "</li>";
+        }
+    }
+
+    socket.on('waypoint-update', function (data) {
+        update_waypoint(data);
+    });
+    socket.emit('fetch-waypoint', '{{waypoint_symbol}}');
+</script>

@@ -281,6 +281,19 @@ def fetch_trade(data):
     emit("trade-update", trade)
 
 
+@socketio.on("fetch-waypoint")
+def fetch_waypoint(data):
+    waypoint = mediator_client.waypoints_view_one(data)
+    output = shf.waypoint_to_dict(waypoint)
+    emit("waypoint-update", output)
+
+
+@app.route("/waypoints/<waypoint_symbol>")
+def view_waypoint(waypoint_symbol):
+    params = {"waypoint_symbol": waypoint_symbol}
+    return render_template("waypoint_panel.html", **params)
+
+
 @socketio.on("refuel")
 # get the "ship_id" from the payload
 def refuel(data):
@@ -331,4 +344,5 @@ if token:
 
 if __name__ == "__main__":
     print("Hello, world!")
+
     socketio.run(app, host="0.0.0.0", port=3000)
