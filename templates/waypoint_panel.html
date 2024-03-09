@@ -3,10 +3,15 @@
 
 {% include '_header.html' %}
 {% include 'top_menu.html' %}
+<div class="col-lg-2 col-sm-12" id="selected_ship">
+</div>
+
 <div class="container-fluid">
     <div class="row">
         <div class="col-lg-4 col-md-6 col-sm-12 " style="border:1px solid red;">
-            <h1 id="waypoint_output_symbol">X1-TEST-A1</h1>
+            <h1><span id="waypoint_output_symbol">X1-TEST-A1</span><a href="#"
+                    onclick="socket.emit('fetch-waypoint', '{{waypoint_symbol}}')">🔃</a>
+            </h1>
             <span id="waypoint_output_type">PLANET</span> in <span id="waypoint_output_systemSymbol">X1-TEST</span> at
             <span id="waypoint_output_x">0</span>, <span id="waypoint_output_y">0</span>.
             <span id="waypoint_output_isUnderConstruction"></span>
@@ -27,58 +32,100 @@
         </div>
         <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
             <h3>Marketplace</h3>
-
+            <div id="market_output">
+                {{market}}
+            </div>
             <hr />
         </div>
-        <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
-            <h3>Shipyard</h3>
+        <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;" id="shipyard_output">
+            <h3>Shipyard <a href="#" onclick="socket.emit('fetch-shipyard', '{{waypoint_symbol}}')">🔃</a>
+            </h3>
+            <ul id="shipyard_output_ships">
 
+            </ul>
+            {{shipyard}}
             <hr />
         </div>
         <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
             <h3>Construction site</h3>
-
+            {{construction}}
             <hr />
         </div>
+        <div class="col-lg-4 col-md-6 col-sm-12" class="logs_output" id="logs_output">
+
+
+        </div>
     </div>
-</div>
 
-<script>
-    function update_waypoint(data) {
-        console.log(data)
-        document.getElementById('waypoint_output_symbol').innerText = data.symbol;
-        document.getElementById('waypoint_output_type').innerText = data.type;
-        document.getElementById('waypoint_output_systemSymbol').innerText = data.systemSymbol;
-        document.getElementById('waypoint_output_x').innerText = data.x;
-        document.getElementById('waypoint_output_y').innerText = data.y;
-        document.getElementById('waypoint_output_isUnderConstruction').innerText = data.isUnderConstruction ? "This waypoint is under construction" : "";
-        //document.getElementById('waypoint_output_faction_symbol').innerText = data.faction.symbol;
-        document.getElementById('waypoint_output_orbitals').innerHTML = "";
+    <script>
+        function update_waypoint(data) {
+            console.log(data)
+            document.getElementById('waypoint_output_symbol').innerText = data.symbol;
+            document.getElementById('waypoint_output_type').innerText = data.type;
+            document.getElementById('waypoint_output_systemSymbol').innerText = data.systemSymbol;
+            document.getElementById('waypoint_output_x').innerText = data.x;
+            document.getElementById('waypoint_output_y').innerText = data.y;
+            document.getElementById('waypoint_output_isUnderConstruction').innerText = data.isUnderConstruction ? "This waypoint is under construction" : "";
+            //document.getElementById('waypoint_output_faction_symbol').innerText = data.faction.symbol;
+            document.getElementById('waypoint_output_orbitals').innerHTML = "";
 
-        if (data.orbitals.length == 0) {
-            document.getElementById('waypoint_output_orbitals').innerHTML = "<li>None</li>";
-        }
-        else {
-            for (let i = 0; i < data.orbitals.length; i++) {
-                document.getElementById('waypoint_output_orbitals').innerHTML += "<li>"
-                    + "<a href='/waypoints/" + data.orbitals[i].symbol + "'>"
-                    + data.orbitals[i].symbol
-                    + "</a></li>";
+            if (data.orbitals.length == 0) {
+                document.getElementById('waypoint_output_orbitals').innerHTML = "<li>None</li>";
+            }
+            else {
+                for (let i = 0; i < data.orbitals.length; i++) {
+                    document.getElementById('waypoint_output_orbitals').innerHTML += "<li>"
+                        + "<a href='/waypoints/" + data.orbitals[i].symbol + "'>"
+                        + data.orbitals[i].symbol
+                        + "</a></li>";
+                }
+            }
+            document.getElementById('waypoint_output_traits').innerHTML = "";
+            for (let i = 0; i < data.traits.length; i++) {
+                document.getElementById('waypoint_output_traits').innerHTML += "<li>"
+                    + data.traits[i].name + ": " + data.traits[i].description
+                    + "</li>";
+            }
+            //if data has the modifiers element
+            if (data.modifiers) {
+
+
+                for (let i = 0; i < data.modifiers.length; i++) {
+                    document.getElementById('waypoint_output_traits').innerHTML += "<li>" + data.modifiers[i].name + ": " + data.modifiers[i].description + "</li>";
+                }
             }
         }
-        document.getElementById('waypoint_output_traits').innerHTML = "";
-        for (let i = 0; i < data.traits.length; i++) {
-            document.getElementById('waypoint_output_traits').innerHTML += "<li>"
-                + data.traits[i].name + ": " + data.traits[i].description
-                + "</li>";
-        }
-        for (let i = 0; i < data.modifiers.length; i++) {
-            document.getElementById('waypoint_output_traits').innerHTML += "<li>" + data.modifiers[i].name + ": " + data.modifiers[i].description + "</li>";
-        }
-    }
 
-    socket.on('waypoint-update', function (data) {
-        update_waypoint(data);
-    });
-    socket.emit('fetch-waypoint', '{{waypoint_symbol}}');
-</script>
+        socket.on('waypoint-update', function (data) {
+            update_waypoint(data);
+        });
+
+        socket.on('market-update', function (data) {
+            document.getElementById('market_output').innerHTML = data;
+        });
+
+        socket.on('shipyard-update', function (data) {
+
+            for (i in data.ships) {
+                ship = data.ships[i];
+
+                document.getElementById('shipyard_output_ships').innerHTML += "<li id='shipyard_output_" + i + "'>"
+                    + ship.name + ": " + ship.purchasePrice
+                    + " <input type='button' value='Buy' onclick='buy_ship(\"" + ship.name + "\", \"" + data.symbol + "\")'/>"
+                    + "</li>";
+            }
+
+        });
+
+        function buy_ship(ship_symbol, waypoint_symbol) {
+            socket.emit('buy-ship', { "ship_type": ship_symbol, "shipyard_symbol": waypoint_symbol });
+        }
+
+        socket.on('construction-update', function (data) {
+            document.getElementById('construction_output').innerHTML = data;
+        });
+        socket.emit('get-waypoint', '{{waypoint_symbol}}');
+        socket.emit('get-market', '{{waypoint_symbol}}');
+        socket.emit('get-shipyard', '{{waypoint_symbol}}');
+        socket.emit('get-construction', '{{waypoint_symbol}}');
+    </script>

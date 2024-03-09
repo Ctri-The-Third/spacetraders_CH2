@@ -71,7 +71,9 @@ class TradeOpportunity:
             "activity": self.start_good.activity,
             "export_tv": self.export_tv,
             "goods_produced_per_hour": self.goods_produced_per_hour,
-            "cph_of_goods_produced": round(self.current_profit_ptrip_pvolume_phour, 2),
+            "profit_per_unit_per_distance": round(
+                self.profit_per_unit / max(self.distance, 1), 2
+            ),
             "strategy": self.strategy,
         }
         if self.end_location:
@@ -106,6 +108,22 @@ class TradeOpportunity:
     def set_additional_properties(self):
         if not self.selected_end_good:
             return
+
+        self.export_tv = self.start_good.trade_volume
+        self.end_location = self.selected_end_good.waypoint
+        self.goods_produced_per_hour = (
+            self.activity_modifiers[self.start_good.activity]
+            * self.start_good.trade_volume
+        )
+        self.distance = self._pathfinder.calc_distance_between(
+            self.start_location, self.end_location
+        )
+        self.update_prices()
+
+    def calculate_and_set_quantity(self):
+
+        "Should be called either on init, or when we receive a market update with new SUPPLY information"
+
         if self.strategy == "MANAGE" and self.start_good.activity != "STRONG":
             supplies = {
                 "ABUNDANT": 5,  # at minimum 1, at max 5?
@@ -126,26 +144,25 @@ class TradeOpportunity:
             }
         elif self.strategy == "SKIM":
             supplies = {
-                "ABUNDANT": 3,
+                "ABUNDANT": 1,
                 "HIGH": 0,
                 "MODERATE": 0,
                 "LIMITED": 0,
                 "SCARCE": 0,
                 "UNKNOWN": 1,
             }
-        self.export_tv = self.start_good.trade_volume
-        self.end_location = self.selected_end_good.waypoint
+        elif self.strategy == "SKIP":
+            supplies = {
+                "ABUNDANT": 0,
+                "HIGH": 0,
+                "MODERATE": 0,
+                "LIMITED": 0,
+                "SCARCE": 0,
+                "UNKNOWN": 0,
+            }
         self.total_quantity = (
             self.start_good.trade_volume * supplies[self.start_good.supply]
         )
-        self.goods_produced_per_hour = (
-            self.activity_modifiers[self.start_good.activity]
-            * self.start_good.trade_volume
-        )
-        self.distance = self._pathfinder.calc_distance_between(
-            self.start_location, self.end_location
-        )
-        self.update_prices()
 
     def update_prices(self):
         if not self.selected_end_good:
@@ -154,15 +171,8 @@ class TradeOpportunity:
             self.selected_end_good.sell_price - self.start_good.buy_price
         )
 
-        if self.selected_end_good.type != "EXCHANGE":
-            self.goods_produced_per_hour = (
-                self.start_good.trade_volume
-                * self.activity_modifiers[self.selected_end_good.activity]
-            )
-        else:
-            self.goods_produced_per_hour = 0
         self.current_profit_ptrip_pvolume_phour = (
-            self.profit_per_unit * self.total_quantity / self.distance
+            self.profit_per_unit * self.total_quantity / max(self.distance, 1)
         )
 
 
@@ -196,7 +206,10 @@ class TradeManager:
         waypoints = client.waypoints_view(hq_sys.symbol)
         opportunities = {}
         for waypoint in waypoints.values():
-            if waypoint.type != "ASTEROID" and len(waypoint.traits) == 0:
+            if (
+                waypoint.type not in ("ASTEROID", "GAS_GIANT")
+                and len(waypoint.traits) == 0
+            ):
                 client.waypoints_view_one(waypoint.symbol, True)
 
         systems = {hq_sys.symbol: {}}
@@ -208,6 +221,10 @@ class TradeManager:
             systems[system] = goods_list = {}
             for waypoint in waypoints:
                 market = self.client.system_market(waypoint)
+                if market.is_stale(30):
+                    new_market = self.client.system_market(waypoint, True)
+                    if len(new_market.listings) != 0:
+                        market = new_market
                 for good in market.imports:
                     if good.symbol not in goods_list:
                         goods_list[good.symbol] = []
@@ -258,10 +275,12 @@ class TradeManager:
         self.opportunities = opportunities
 
     def update_opportunities(self):
+        "When should this be called?"
         for system, opportunities in self.opportunities.items():
             for opportunity in opportunities:
                 opportunity: TradeOpportunity
                 opportunity.set_additional_properties()
+                opportunity.calculate_and_set_quantity()
 
     def update_market(self, market: st_models.Market):
         "receives a market object, and updates all opportunities associated with it"
@@ -279,6 +298,7 @@ class TradeManager:
                     opportunity.start_location, matching_tg, "EXPORT", matching_tgl
                 )
                 opportunity.set_additional_properties()
+                opportunity.calculate_and_set_quantity()
             else:
                 for end_good in opportunity.possible_end_goods:
                     if end_good.waypoint.symbol == market.symbol:
@@ -337,18 +357,24 @@ class TradeManager:
         self,
         system_symbol: str,
         start_location: str,
-        max_distance: int,
         ship_cargo_capacity: int,
+        max_distance: int = None,
     ):
 
+        if not max_distance:
+            max_distance = float("inf")
         local_opportunities = self.opportunities.get(system_symbol, [])
         start_waypoint = self.client.waypoints_view_one(start_location)
         valid_opportunities = []
         for opportunity in local_opportunities:
             opportunity: TradeOpportunity
+            if opportunity.strategy == "SKIP":
+                continue
             if opportunity.distance > max_distance:
                 continue
             if opportunity.profit_per_unit < 0:
+                continue
+            if opportunity.total_quantity <= 0:
                 continue
             total_distance = (
                 self._pathfinder.calc_distance_between(
@@ -356,9 +382,7 @@ class TradeManager:
                 )
                 + opportunity.distance
             )
-            potential_quantity = min(
-                max(opportunity.total_quantity, 1), ship_cargo_capacity
-            )
+            potential_quantity = min(opportunity.total_quantity, ship_cargo_capacity)
             score = (opportunity.profit_per_unit * potential_quantity) / max(
                 total_distance, 1
             )
@@ -367,7 +391,12 @@ class TradeManager:
         valid_opportunities.sort(key=lambda x: x[0], reverse=True)
         if valid_opportunities:
             best_opp = valid_opportunities[0][1]
+
             return best_opp
+        elif max_distance < float("inf"):
+            return self.pick_best_trade(
+                system_symbol, start_location, ship_cargo_capacity
+            )
 
         # we need to reduce the total quantity by the amount of cargo we have
 
@@ -405,13 +434,68 @@ class TradeManager:
         while True:
             time.sleep(900)
             loops += 1
-
+            # currently we're blindly increasing the quantity - but if we're skimming (for example) then we shouldn't be increasing the quantity unless we're in the right supply state
+            # but supply state isn't something we're actively modelling - so this is instead should be a "check on the market"  function instead.
+            # for each market we're monitoring - if the strategy is "MANAGE" then we should check every 30 minutes (1 TV)
+            # if the strategy is "SKIM" we should check every 2 hours (1 TV at RESTRICTED)
+            got_markets = {}
             for system in self.opportunities.values():
                 for opp in system:
                     opp: TradeOpportunity
-                    if opp.start_good.supply != "ABUNDANT":
-                        opp.total_quantity += opp.goods_produced_per_hour / 4
+                    export_market = self.get_market(opp.start_location, got_markets)
+                    refresh = False
+                    export_market: st_models.Market
+                    if opp.strategy == "MANAGE":
+                        refresh = export_market.is_stale(30)
+                    elif opp.strategy == "SKIM":
+                        refresh = export_market.is_stale(120)
+
+                    if refresh:
+                        export_market = self.get_market(
+                            opp.start_location, got_markets, True
+                        )
+
+                    for import_market in opp.possible_end_goods:
+                        import_market: TradeGood
+                        refresh = False
+                        import_market = self.get_market(
+                            import_market.waypoint, got_markets
+                        )
+                        import_market: st_models.Market
+                        if opp.strategy == "MANAGE":
+                            refresh = import_market.is_stale(30)
+                        elif opp.strategy == "SKIM":
+                            refresh = import_market.is_stale(120)
+
+                        if refresh:
+                            wayp = st_models.Waypoint(
+                                st_utils.waypoint_to_system(import_market.symbol),
+                                import_market.symbol,
+                                "",
+                                0,
+                                0,
+                                [],
+                                [],
+                                [],
+                                False,
+                                False,
+                                [],
+                            )
+                            import_market = self.get_market(wayp, got_markets, True)
+
                     opp.update_prices()
+                    opp.calculate_and_set_quantity()
+
+    def get_market(
+        self, waypoint: st_models.Waypoint, got_markets: dict, refresh: bool = False
+    ):
+        if waypoint.symbol in got_markets and not refresh:
+            return got_markets[waypoint.symbol]
+        market = self.client.system_market(waypoint, refresh)
+        if len(market.listings) > 0:
+
+            got_markets[waypoint.symbol] = market
+        return market
 
     def list_opportunities(self, system_symbol: str):
 
@@ -429,6 +513,10 @@ class TradeManager:
             for opportunity in self.list_opportunities(system):
                 opportunity: TradeOpportunity
                 systems[system].append(opportunity.to_dict())
+            systems[system].sort(
+                key=lambda x: (x["profit_per_unit_per_distance"] * x["total_quantity"]),
+                reverse=True,
+            )
         return systems
 
     def claim_trade(

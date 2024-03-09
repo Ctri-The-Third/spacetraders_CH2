@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, send, emit
 import straders_sdk.models
 from straders_sdk.clients import SpaceTradersMediatorClient
 from straders_sdk.pathfinder import PathFinder
+import straders_sdk.utils as st_utils
 import time, math
 from datetime import datetime, timedelta
 from classes.ship_locker import ShipLocker
@@ -19,6 +20,7 @@ class ShipHandler:
     def __init__(self, client: SpaceTradersMediatorClient, socket: SocketIO):
         self.client = client
         self.socket = socket
+        self.pathfinder = PathFinder(client)
 
     def intrasolar_travel(self, ship_name: str, waypoint: str):
         client = self.client
@@ -30,7 +32,7 @@ class ShipHandler:
             return
         ship = client.ships_view_one(ship_name)
         destination = client.waypoints_view_one(waypoint)
-        pf = PathFinder(client)
+        pf = self.pathfinder
         if not ship:
             self.socket.send(f"Ship not found - {ship.error_code}")
             locker.unlock_early(ship_name)
@@ -51,7 +53,7 @@ class ShipHandler:
         distance = pf.calc_distance_between(origin, destination)
         travel_time = pf.calc_travel_time_between_wps_with_fuel(origin, destination)
 
-        if distance < ship.fuel_current:
+        if distance < ship.fuel_current or ship.fuel_capacity == 0:
             # go direct
             self._travel_hop(ship, waypoint)
 
@@ -61,8 +63,33 @@ class ShipHandler:
             client.ship_orbit(ship)
             self._travel_hop(ship, waypoint)
         else:
-            self.socket.send("Multi-hop route not implimented - not going anywhere")
+            origin = client.waypoints_view_one(ship.nav.waypoint_symbol)
+            destination = client.waypoints_view_one(waypoint)
+            route = self.pathfinder.plot_system_nav(
+                origin.system_symbol,
+                origin,
+                destination,
+                ship.fuel_capacity,
+                force_recalc=True,
+            )
+            if not route or route.needs_drifting:
+                self.socket.send("No route found")
+                locker.unlock_early(ship_name)
+                return
+            route.route.pop(0)
+            for waypoint_s in route.route:
+                next_destination = client.waypoints_view_one(waypoint_s)
+                fuel_needed = pf.calc_distance_between(origin, next_destination)
+                if ship.fuel_capacity > 0 and (
+                    fuel_needed > ship.fuel_current or ship.fuel_current <= 5
+                ):
+                    self.refuel(ship_name)
+                self._travel_hop(ship, waypoint_s)
+
         locker.unlock_early(ship_name)
+
+    def force_unlock(self, ship_name: str):
+        locker.unlock_early(ship_name, force=True)
 
     def _travel_hop(self, ship, waypoint):
         client = self.client
@@ -233,6 +260,10 @@ class ShipHandler:
         if not trade:
             self.socket.send(f"Couldn't find a trade for ship {ship.name}")
             return
+
+        if not trade.end_location:
+            self.socket.send(f"Trade {trade.trade_symbol} end location not found")
+            return
         trade: trademanager.TradeOpportunity
         projected_profit = trade.profit_per_unit * min(
             trade.total_quantity, ship.cargo_capacity
@@ -391,11 +422,20 @@ def market_to_dict(market: straders_sdk.models.Market):
 
 def shipyard_to_dict(shipyard: straders_sdk.models.Shipyard):
 
-    return {shipyard.to_json()}
+    return shipyard.to_json()
 
 
 def waypoint_to_dict(waypoint: straders_sdk.models.Waypoint):
-    return waypoint.to_json()
+    return_obj = waypoint.to_json()
+    return_obj["has_market"] = waypoint.has_market
+    return_obj["has_shipyard"] = waypoint.has_shipyard
+    return_obj["has_construction"] = waypoint.under_construction
+    return_obj["traits_friendly"] = ", ".join([t.symbol for t in waypoint.traits])
+    return_obj["symbol_suffix"] = st_utils.waypoint_suffix(waypoint.symbol)
+    return_obj["orbitals_friendly"] = ", ".join(
+        [st_utils.waypoint_suffix(o["symbol"]) for o in waypoint.orbitals]
+    )
+    return return_obj
 
 
 def construction_to_dict(construction: straders_sdk.models.ConstructionSite):

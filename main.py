@@ -136,6 +136,17 @@ def display_ship_panel(ship_name):
     return render_template("ship_panel.html", **params)
 
 
+@app.route("/systems/<system_symbol>")
+def view_system(system_symbol):
+    system = mediator_client.systems_view_one(system_symbol)
+    waypoints = mediator_client.waypoints_view(system_symbol)
+    params = {
+        "system": system,
+        "waypoints": [shf.waypoint_to_dict(wp) for wp in waypoints.values()],
+    }
+    return render_template("system_panel.html", **params)
+
+
 @app.route("/trades")
 @check_login
 def view_trade_manager():
@@ -194,6 +205,11 @@ def sell(data):
     shf.sell(ship_id, good, quantity)
 
 
+@socketio.on("force-unlock")
+def unlock(data):
+    shf.force_unlock(data)
+
+
 @socketio.on("fetch-markets")
 def fetch_markets():
     agent = mediator_client.view_my_self()
@@ -213,6 +229,9 @@ def execute_trade(data):
     trade_symbol = data.get("trade_symbol")
     start_location = data.get("start_location")
     end_location = data.get("end_location")
+    if not end_location:
+        send("No end location specified")
+        return
     quantity = data.get("quantity", 0)
     shf.execute_trade(ship_id, trade_symbol, start_location, end_location, quantity)
 
@@ -222,16 +241,23 @@ def execute_best_trade(data):
     shf.execute_best_trade(data)
 
 
+@socketio.on("get-market")
+def get_market(data):
+    fetch_market(data, False)
+
+
 @socketio.on("fetch-market")
-def fetch_market(data):
+def fetch_market(data, force_refresh=True):
     if not isinstance(data, str):
         send("Invalid data type")
-    waypoint = mediator_client.waypoints_view_one(data)
+    waypoint = mediator_client.waypoints_view_one(data, force=force_refresh)
     if not waypoint:
         send(f"Waypoint not found - {waypoint.error_code}")
         return
-
-    market = mediator_client.system_market(waypoint)
+    if "MARKETPLACE" not in [t.symbol for t in waypoint.traits]:
+        send("This waypoint is not a marketplace")
+        return
+    market = mediator_client.system_market(waypoint, force_update=force_refresh)
     market: straders_sdk.models.Market
     if market.is_stale(15):
         new_market = mediator_client.system_market(waypoint, True)
@@ -240,7 +266,45 @@ def fetch_market(data):
 
             market = new_market
 
-    emit("market_update", shf.market_to_dict(market))
+    emit("market-update", shf.market_to_dict(market))
+
+
+@socketio.on("buy-ship")
+def buy_ship(data):
+    ship_type = data.get("ship_type")
+    shipyard_symbol = data.get("shipyard_symbol")
+    response = mediator_client.ships_purchase(ship_type, shipyard_symbol)
+
+    if response:
+        ship, agent = response
+        emit("ship-box", render_template("ship_box.html", ship=shf.ship_to_dict(ship)))
+
+    pass
+
+
+@socketio.on("get-shipyard")
+def get_shipyard(data):
+    fetch_shipyard(data, False)
+
+
+@socketio.on("fetch-shipyard")
+def fetch_shipyard(data, force_update=True):
+    waypoint = mediator_client.waypoints_view_one(data, force=force_update)
+    if not waypoint or not waypoint.has_shipyard:
+        send("No shipyard at this location")
+        return
+    shipyard = mediator_client.system_shipyard(waypoint, force_update=force_update)
+    emit("shipyard-update", shf.shipyard_to_dict(shipyard))
+
+
+@socketio.on("fetch-construction")
+def fetch_construction(data):
+    waypoint = mediator_client.waypoints_view_one(data)
+    if not waypoint or not waypoint.under_construction:
+        send("No construction at this location")
+        return
+    construction = mediator_client.system_construction(waypoint)
+    emit("construction-update", shf.construction_to_dict(construction))
 
 
 @socketio.on("list-ships")
@@ -261,16 +325,27 @@ def fetch_ship_block(data):
     emit("ship-box", render_template("ship_box.html", ship=shf.ship_to_dict(ship)))
 
 
+@socketio.on("get-ship")
+def get_ship(data):
+    fetch_ship(data, False)
+
+
 @socketio.on("fetch-ship")
-def fetch_ship(data):
-    ship = mediator_client.ships_view_one(data, True)
+def fetch_ship(data, force_refresh=True):
+    ship = mediator_client.ships_view_one(data, force_refresh)
     emit("ship-update", shf.ship_to_dict(ship))
+
+
+@socketio.on("get-trades")
+def get_trades():
+    tm = TradeManager(mediator_client)
+    emit("trades-update", tm.list_opportunities_for_json())
 
 
 @socketio.on("fetch-trades")
 def fetch_trades():
     tm = TradeManager(mediator_client)
-    tm.update_opportunities()
+    tm.populate_opportunities()
     emit("trades-update", tm.list_opportunities_for_json())
 
 
@@ -281,9 +356,14 @@ def fetch_trade(data):
     emit("trade-update", trade)
 
 
+@socketio.on("get-waypoint")
+def get_waypoint(data):
+    fetch_waypoint(data, False)
+
+
 @socketio.on("fetch-waypoint")
-def fetch_waypoint(data):
-    waypoint = mediator_client.waypoints_view_one(data)
+def fetch_waypoint(data, force_refresh=True):
+    waypoint = mediator_client.waypoints_view_one(data, force=force_refresh)
     output = shf.waypoint_to_dict(waypoint)
     emit("waypoint-update", output)
 

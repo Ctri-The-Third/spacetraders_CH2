@@ -110,6 +110,14 @@ label {
     color: #cfc;
 }
 
+.trade_row {
+    border-bottom: 1px solid green;
+}
+
+.trade_row:nth-child(even) {
+    background-color: #303030;
+}
+
 .system_overview div {
     border: 2px solid green;
     border-radius: 10px;
@@ -134,7 +142,7 @@ a.nav-link {
 
     padding: 5px;
     font-size: 10px;
-
+    margin-bottom: 5px;
     overflow: hidden;
 
 }

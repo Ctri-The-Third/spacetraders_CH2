@@ -4,10 +4,10 @@
 {% include '_header.html' %}
 {% include 'top_menu.html' %}
 
-<h1>{{ship.symbol}} <a onclick="socket.emit('fetch-ship','{{ship.symbol}}');return false;">🔃</a>
+<h1>{{ship.symbol}} <a href="#" onclick="socket.emit('fetch-ship','{{ship.symbol}}');return false;">🔃</a>
 </h1>
 <input type="hidden" id="active_ship" value="{{ship.symbol}}" />
-{{ship.registration.role}} <br />
+{{ship.registration.role}} <a onclick="socket.emit('force-unlock','{{ship.symbol}}'); return false;">🔓</a><br />
 Hull: {{ship.frame.name}} (<span id="{{ship.symbol}}_frame_condition">{{ship.frame.condition}}</span>/100)<br />
 Reactor: {{ship.reactor.name}} (<span
     id="{{ship.symbol}}_reactor_condition">{{ship.reactor.condition}}</span>/100)<br />
@@ -15,8 +15,9 @@ Engines: {{ship.engine.name}} (<span id="{{ship.symbol}}_engines_condition">{{sh
 <hr />
 Status: <span class="ship_info" id="{{ship.symbol}}_nav_status">{{ship.nav.status}}</span> <br />
 System: <span class="ship_info" id="system">{{ship.nav.systemSymbol}}</span> <br />
-Waypoint: <span class="ship_info" id="{{ship.symbol}}_nav_waypointSymbol">{{ship.nav.waypointSymbol}}</span> <br />
-<input type="text" id="destination" placeholder="{{ship.nav.waypointSymbol}}" value="{{ship.nav.systemSymbol}}-" />
+Waypoint: <span class="ship_info" id="{{ship.symbol}}_nav_waypointSymbol"><a
+        href="/waypoints/{{ship.nav.waypointSymbol}}">{{ship.nav.waypointSymbol}}</a></span> <br /> <input type="text"
+    id="destination" placeholder="{{ship.nav.waypointSymbol}}" value="{{ship.nav.systemSymbol}}-" />
 <input type="button" value="travel" onclick="travel()" /><br />
 Fuel: <span class="ship_info" id="{{ship.symbol}}_fuel_current">{{ship.fuel.current}}</span>/{{ship.fuel.capacity}}
 <input type="button" value="Refuel" onclick="socket.emit('refuel', {'ship_name':'{{ship.symbol}}'})" /><br />

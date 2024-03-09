@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+
+{% include '_header.html' %}
+{% include 'top_menu.html' %}
+<h1><span id=system_output_symbol>{{system.symbol}}</span><a href="#"
+        onclick="socket.emit('fetch-system','{{system.symbol}}');">🔃</a></h1>
+<span id="system_output_system_type">{{system.system_type}}</span> at <span id="system_output_x">{{system.x}}</span>,
+<span id="system_output_y">{{system.y}}</span>
+<div id="system_output_{{system.symbol}}" class="container-fluid">
+    <div class="row">
+        {% for waypoint in waypoints %}
+        <div class="col-xl-2  col-lg-2 col-sm-3">
+            {% include 'waypoint_box.html' %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+</html>
+
+
+<script>
+    socket.emit('get-system', '{{system.symbol}}');
+    socket.on("get-system", function (data) {
+        console.log(data);
+        document.getElementById('system_output_symbol').innerHTML = data.symbol;
+        document.getElementById('system_output_system_type').innerHTML = data.system_type;
+        document.getElementById('system_output_x').innerHTML = data.x;
+        document.getElementById('system_output_y').innerHTML = data.y;
+        document.getElementById('system_output_' + data.symbol).innerHTML = '';
+        for (var i = 0; i < data.waypoints.length; i++) {
+            var waypoint = data.waypoints[i];
+            var waypoint_output = document.createElement('div');
+            waypoint_output.innerHTML = `
+            <div class="ship-box" id="waypoint_output_${waypoint.symbol}">
+                <a href="{{request.url_root}}waypoints/${waypoint.symbol}">
+                    <b>${waypoint.symbol}</b></a>
+                [${waypoint.has_market}]
+                <span id="waypoint_output_${waypoint.symbol}_has_shipyard">
+                    ${waypoint.has_shipyard ? '🏗️' : ''}
+                </span>
+                <span id="waypoint_output_${waypoint.symbol}_has_market">
+                    ${waypoint.has_market ? '⛽' : ''}
+                </span><br />
+                <span id="waypoint_output_${waypoint.symbol}_orbitals">Orbitals: ${waypoint.orbitals_friendly}</span><br />
+                <span id="waypoint_output_${waypoint.symbol}_type">${waypoint.type}</span><br />
+                <span id="waypoint_output_${waypoint.symbol}_traits">${waypoint.traits_friendly}</span>
+            </div>
+            `;
+            document.getElementById('system_output_' + data.symbol).appendChild(waypoint_output);
+        }
+    })
+</script>

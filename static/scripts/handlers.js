@@ -59,6 +59,11 @@ function update_ship_object(prefix, ship) {
         }
     }
     rec_update_ship_object(prefix, ship);
+
+    waypoint = document.getElementById(prefix + "_nav_waypointSymbol");
+    if (waypoint) {
+        waypoint.innerHTML = "<a href = 'waypoints/" + ship.nav.waypointSymbol + "'>" + ship.nav.waypointSymbol + "</a>";
+    }
 }
 function rec_update_ship_object(prefix, ship_piece) {
     // for each parameter, find the matching document ID and update it if it exists

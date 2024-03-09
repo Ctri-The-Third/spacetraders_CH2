@@ -36,26 +36,26 @@
     <h2>{{system}}</h2>
     <div class="container-fluid" id="trades_{{system}}">
         <div class="row">
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 FUEL
 
             </div>
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 X1-TEST-A1
             </div>
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 X1-TEST-A2
             </div>
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 100u
             </div>
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 Supply 0 (TV)
             </div>
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 0.0/h
             </div>
-            <div class="col-lg-2 col-md-3 col-sm-4">
+            <div class="col-lg-2 col-sm-6">
                 555 (5.55)
             </div>
         </div>
@@ -82,7 +82,7 @@
 
 
 
-    socket.emit('fetch-trades');
+    socket.emit('get-trades');
     socket.emit("fetch-ship-autopilotstate", document.getElementById('list_of_ship_symbols').value);
     fetch_ship();
 
@@ -117,39 +117,35 @@
 
             var newRow = document.createElement("div");
             // set class = "row"
-            newRow.className = "row";
+            newRow.className = "row trade_row";
             table.appendChild(newRow);
 
             var newCell = document.createElement("div");
-            newCell.className = "col-lg-2 col-md-3 col-sm-4";
+            newCell.className = "col-lg-2 col-sm-6";
             newCell.textContent = "Symbol";
             newRow.appendChild(newCell);
 
             newCell = document.createElement("div");
-            newCell.className = "col-lg-2 col-md-3 col-sm-4";
+            newCell.className = "col-lg-4 col-sm-12";
             newCell.textContent = "Start -> end (dist ance)";
             newRow.appendChild(newCell);
 
 
             newCell = document.createElement("div");
-            newCell.className = "col-lg-2 col-md-3 col-sm-4";
-            newCell.textContent = "Quantity";
+            newCell.className = "col-lg-2 col-sm-6";
+            newCell.textContent = "Quantity (tv), activity/hour";
             newRow.appendChild(newCell);
 
 
-            newCell = document.createElement("div");
-            newCell.className = "col-lg-2 col-md-3 col-sm-4";
-            newCell.textContent = "q/hour";
-            newRow.appendChild(newCell);
 
 
             newCell = document.createElement("div");
-            newCell.className = "col-lg-2 col-md-3 col-sm-4";
-            newCell.textContent = "profit_per_distance";
+            newCell.className = "col-lg-2 col-sm-6";
+            newCell.textContent = "profit (unit), (unit/distance)";
             newRow.appendChild(newCell);
 
             newCell = document.createElement("div");
-            newCell.className = "col-lg-2 col-md-3 col-sm-4";
+            newCell.className = "col-lg-2 col-sm-6";
             newCell.textContent = "Execute";
             newRow.appendChild(newCell);
 
@@ -157,11 +153,11 @@
                 op = data[system][key];
                 var newRow = document.createElement("div");
                 // set class = "row"
-                newRow.className = "row";
+                newRow.className = "row trade_row";
                 table.appendChild(newRow);
 
                 newCell = document.createElement("div");
-                newCell.className = "col-lg-2 col-md-3 col-sm-4";
+                newCell.className = "col-lg-2 col-sm-6";
                 text_content = "<a href = '/trade/" + system + "/" + op.trade_symbol + "'>"
                 text_content += "<img src='/static/icons/GOOD_" + op.trade_symbol + ".png'/>" + op.trade_symbol;
                 text_content += "</a>";
@@ -169,7 +165,7 @@
                 newRow.appendChild(newCell);
 
                 newCell = document.createElement("div");
-                newCell.className = "col-lg-2 col-md-3 col-sm-4";
+                newCell.className = "col-lg-4 col-sm-12";
                 text_content = "<a href = 'waypoints/" + op.start_location + "'>" + op.start_location + "</a>"
                     + " -> "
                     + "<a href = 'waypoints/" + op.end_location + "'>" + op.end_location + "</a>"
@@ -179,25 +175,21 @@
 
 
                 newCell = document.createElement("div");
-                newCell.className = "col-lg-2 col-md-3 col-sm-4";
-                text_content = "<img src='/static/icons/" + op.supply + ".png' />" + op.total_quantity + " (" + op.export_tv + ")";
+                newCell.className = "col-lg-2 col-sm-6";
+                text_content = "<img src='/static/icons/" + op.supply + ".png' />" + op.total_quantity + " (" + op.export_tv + "), ";
+                text_content += "<img src='/static/icons/" + op.activity + ".png' />+" + op.goods_produced_per_hour + "/h";
                 newCell.innerHTML = text_content;
                 newRow.appendChild(newCell);
 
-                newCell = document.createElement("div");
-                newCell.className = "col-lg-2 col-md-3 col-sm-4";
-                text_content = "<img src='/static/icons/" + op.activity + ".png' />" + op.goods_produced_per_hour;
-                newCell.innerHTML = text_content;
-                newRow.appendChild(newCell);
 
                 newCell = document.createElement("div");
-                newCell.className = "col-lg-2 col-md-3 col-sm-4";
-                profit_per_distance = op.cph_of_goods_produced;
+                newCell.className = "col-lg-2 col-sm-6";
+                profit_per_distance = "" + op.profit_per_unit + "cr/u, (" + op.profit_per_unit_per_distance + ")";
                 newCell.innerHTML = profit_per_distance;
                 newRow.appendChild(newCell);
 
                 newCell = document.createElement("div");
-                newCell.className = "col-lg-2 col-md-3 col-sm-4";
+                newCell.className = "col-lg-2 col-sm-6";
                 emit_instruction = 'execute_trade(\"' + op.trade_symbol + '\", \"' + op.start_location + '\", \"' + op.end_location + '\", \"' + op.total_quantity + '\")';
                 inner_html = "<input type = 'button' value = 'execute' onclick='" + emit_instruction + "'/> ";
                 newCell.innerHTML = inner_html;

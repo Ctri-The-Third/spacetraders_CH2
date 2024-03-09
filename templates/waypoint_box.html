@@ -1,0 +1,14 @@
+<div class="ship-box" id="waypoint_output_{{waypoint.symbol}}"> <a
+        href="{{request.url_root}}waypoints/{{waypoint.symbol}}">
+        <b>{{waypoint.symbol}}</b></a>
+    <span id="waypoint_output_{{waypoint.symbol}}_has_shipyard">
+        {% if waypoint.has_shipyard %}🏗️{% endif %}
+    </span>
+    <span id="waypoint_output_{{waypoint.symbol}}_has_market">
+        {% if waypoint.has_market %}⛽{% endif %}
+    </span><br />
+    <span id="waypoint_output_{{waypoint.symbol}}_orbitals">Orbitals: {{waypoint.orbitals_friendly}}</span><br />
+    <span id="waypoint_output_{{waypoint.symbol}}_type">{{waypoint.type}}</span><br />
+    <div id="waypoint_output_{{waypoint.symbol}}_traits" style="width:100%; height:3em; overflow:hidden;">
+        {{waypoint.traits_friendly}}</div>
+</div>

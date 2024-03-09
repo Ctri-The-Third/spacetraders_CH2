@@ -61,16 +61,18 @@ class ShipLocker:
             else:
                 return None
 
-    def unlock_early(self, ship_name: str, lock_id: str = None):
+    def unlock_early(self, ship_name: str, lock_id: str = None, force=False):
         if not lock_id:
             lock_id = current_thread().ident
         with self.lock:
             if ship_name in self._ships and self._ships[ship_name]:
 
-                if self._ships[ship_name].lock_id == lock_id:
+                if self._ships[ship_name].lock_id == lock_id or force:
                     self._ships[ship_name] = None
                     return True
-            return False
+                else:
+                    return False
+            return True
 
 
 class ShipLock:

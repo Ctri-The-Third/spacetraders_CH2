@@ -65,6 +65,7 @@ class TradeAutoPilot:
                     continue
                 if ship_d and ship_d["thread"] and ship_d["thread"].is_alive():
                     continue
+
                 thread = threading.Thread(
                     target=self.ship_controller.execute_best_trade,
                     args=(ship_id,),
@@ -81,6 +82,14 @@ class TradeAutoPilot:
             ships = json.load(f)
             for ship in ships:
                 self.register_ship(ship, False)
+
+        ships = self.client.ships_view()
+        for ship_symbol, ship in ships.items():
+            # if the ship is moving, or has cargo, we need to leave it be.
+            ship: st_models.Ship
+            if ship.nav.travel_time_remaining >= 0 or ship.cargo_units_used > 0:
+
+                self.unregister_ship(ship.name)
 
     def save_autopilot(self):
         # save the autopilot to a file

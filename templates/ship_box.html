@@ -1,6 +1,6 @@
 <div class="  ship-box" id={{ship.symbol}}>
-    <a href="ships/{{ship.symbol}}"
-        onclick="window.open('ships/{{ship.symbol}}','{{ship.symbol}}','menubar=no,toolbar=no, width=400, height=800'); return false;">
+    <a href="{{request.url_root}}ships/{{ship.symbol}}"
+        onclick="window.open('{{request.url_root}}ships/{{ship.symbol}}','{{ship.symbol}}','menubar=no,toolbar=no, width=400, height=800'); return false;">
         [{{ ship.symbol }}] <div style="text-align:right; float:right;">[{{ ship.registration.emoji }}
             {{ship.frame.emoji}}]</div>
     </a>
