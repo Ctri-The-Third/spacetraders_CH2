@@ -61,6 +61,7 @@ Milestone 6:
  * has assigned shpips (just extractors)
  * has sell locations (be those exchanges, or imports)
 * mining site panel appears on waypoint panel 
+* Trade panel shows requisite imports, and potential export destinations
 
 Goals we didn't know we had (tech debt)
 * ✅ Restructure the SDK so that clients, models, and responses are all in their own sub-packages, instead of spread out as they are presently.

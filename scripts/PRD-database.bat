@@ -1,3 +1,9 @@
+
+docker login 
+docker buildx build --push --platform linux/amd64,linux/arm64  -t ctriatanitan/spacetraders_db:latest -f spacetraders_sdk/postgres.dockerfile spacetraders_sdk/.
+
+
+
 docker stop spacetraders_db_container
 docker rm spacetraders_db_container
 docker pull ctriatanitan/spacetraders_db:latest
