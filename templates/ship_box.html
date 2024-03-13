@@ -9,7 +9,8 @@
     <div style="text-align:right; float:right;" class="timer" id="{{ship.symbol}}_nav_secondsRemaining">
         {{ship.nav.secondsRemaining}}
     </div> <br />
-    Waypoint: <span id="{{ship.symbol}}_nav_waypointSymbol">{{ship.nav.waypointSymbol}}</span>
+    Waypoint: <span id="{{ship.symbol}}_nav_waypointSymbol"><a
+            href='waypoints/{{ship.nav.waypointSymbol}}'>{{ship.nav.waypointSymbol}}</a></span>
     <div style="text-align:right; float:right;" class="timer" id="{{ship.symbol}}_cooldown_remainingSeconds">
         {{ship.cooldown.remainingSeconds}}
     </div>

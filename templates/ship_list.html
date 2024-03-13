@@ -12,29 +12,7 @@ All ships belonging to {{agent.symbol}}, <span id="agent_output_credits">{{agent
 
         {% for ship in ships %}
         <div class=" col-lg-2 col-md-4 col-sm-6" id={{ship.symbol}}>
-            <div class="mx-2 ship-box"> <a href="ships/{{ship.symbol}}"
-                    onclick="window.open('ships/{{ship.symbol}}','{{ship.symbol}}','menubar=no,toolbar=no, width=400, height=800'); return false;">
-                    [{{ ship.symbol }}] <div style="text-align:right; float:right;">[{{ ship.registration.emoji }}
-                        {{ship.frame.emoji}}]</div>
-                </a>
-                <br />
-                System: <span id="{{ship.symbol}}_nav_systemSymbol">{{ship.nav.systemSymbol}}</span>
-                <div style="text-align:right; float:right;" class="timer" id="{{ship.symbol}}_nav_secondsRemaining">
-                    {{ship.nav.secondsRemaining}}
-                </div> <br />
-                Waypoint: <span id="{{ship.symbol}}_nav_waypointSymbol">{{ship.nav.waypointSymbol}}</span>
-                <div style="text-align:right; float:right;" class="timer"
-                    id="{{ship.symbol}}_cooldown_remainingSeconds">
-                    {{ship.cooldown.remainingSeconds}}
-                </div>
-
-                <br />
-                📦<span id="{{ship.symbol}}_cargo_units">{{ship.cargo.units}}</span>/{{ship.cargo.capacity}} <div
-                    style="text-align:right; float:right;">
-                    <span id="{{ship.symbol}}_fuel_current">{{ship.fuel.current}}</span>/{{ship.fuel.capacity}}⛽
-                </div>
-                {% if ship.behaviour %}<br />{{ship.behaviour}}{% endif %}
-            </div>
+            {% include 'ship_box.html' %}
         </div>
         {% endfor %}
     </div>
