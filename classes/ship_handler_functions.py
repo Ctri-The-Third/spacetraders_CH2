@@ -106,7 +106,7 @@ class ShipHandler:
         self.socket.emit("ship-update", ship_to_dict(ship))
         time.sleep(ship.nav.travel_time_remaining + 1)
 
-        ship.nav.status = "ORBIT"
+        ship.nav.status = "IN_ORBIT"
         ship.nav_dirty = True
         client.update(ship)
         self.socket.send("Ship arrived")
@@ -401,28 +401,42 @@ def market_to_dict(market: straders_sdk.models.Market):
             "purchasePrice": good.purchase_price,
             "sellPrice": good.sell_price,
         }
+        tradegood = market.get_tradegood(good.symbol)
+        listing["name"] = tradegood.name
+        listing["description"] = tradegood.description
         out_obj["tradeGoods"].append(listing)
+
+        # sort by exports, imports, exchange
+    out_obj["tradeGoods"].sort(key=lambda x: x["type"])
+    for good in market.exports:
         stub = {
             "symbol": good.symbol,
-            # "name": good.name,
-            # "description": good.description,
+            "name": good.name,
+            "description": good.description,
         }
-    for good in market.exports:
-        stub = {"symbol": good.symbol}
         out_obj["exports"].append(stub)
     for good in market.imports:
-        stub = {"symbol": good.symbol}
+        stub = {
+            "symbol": good.symbol,
+            "name": good.name,
+            "description": good.description,
+        }
 
         out_obj["imports"].append(stub)
     for good in market.exchange:
-        stub = {"symbol": good.symbol}
+        stub = {
+            "symbol": good.symbol,
+            "name": good.name,
+            "description": good.description,
+        }
         out_obj["exchange"].append(stub)
     return out_obj
 
 
 def shipyard_to_dict(shipyard: straders_sdk.models.Shipyard):
-
-    return shipyard.to_json()
+    if shipyard:
+        return shipyard.to_json()
+    return {}
 
 
 def waypoint_to_dict(waypoint: straders_sdk.models.Waypoint):
@@ -505,7 +519,8 @@ def ship_to_dict(ship: straders_sdk.models.Ship):
             "symbol": ship.frame.symbol,
             "name": ship.frame.name,
             "description": ship.frame.description,
-            "condition": ship.frame.condition,
+            "condition": round(ship.frame.condition, 4),
+            "integrity": round(ship.frame.integrity, 4),
             "moduleSlots": ship.frame.module_slots,
             "mountingPoints": ship.frame.mounting_points,
             "fuelCapacity": ship.fuel_capacity,

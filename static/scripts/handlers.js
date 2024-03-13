@@ -84,6 +84,7 @@ function rec_update_ship_object(prefix, ship_piece) {
     }
 }
 socket.on("market-update", function (data) {
+
     console.log("Market update received: " + data);
     //if data is a dict already, assign it to the ship variable. if it's a string, json parse it.
     var market = (typeof data === 'object') ? data : JSON.parse(data);
@@ -95,7 +96,7 @@ socket.on("market-update", function (data) {
     new_listings = {};
     listings.forEach(function (listing) {
         new_listings[listing.symbol] = listing;
-        console.log("listing: " + listing.symbol + " " + listing.type + " " + listing.supply + " " + listing.activity + " " + listing.purchasePrice + " " + listing.sellPrice)
+
     });
     market.tradeGoods = new_listings;
 
@@ -176,73 +177,34 @@ function update_market_object(prefix, market) {
     if (element) { element.innerHTML = content; }
 
 
-    table = document.getElementById(prefix + "_tradeGoods");
-    if (table) {
-        table.innerHTML = '';
+    for (var key in market.tradeGoods) {
+        // supply, activity, tradeVolume, purchasePrice, sellPrice
+        element = document.getElementById(prefix + "_listing_" + key + "_supply_img")
+        if (element) { element.src = "/static/icons/" + market.tradeGoods[key].supply + ".PNG" }
 
-        var newRow = table.insertRow(-1);
-        newCell = document.createElement("th");
-        newCell.textContent = "Good";
-        newRow.appendChild(newCell);
+        element = document.getElementById(prefix + "_listing_" + key + "_supply")
+        if (element) { element.innerHTML = market.tradeGoods[key].supply }
 
-        newCell = document.createElement("th");
-        newCell.textContent = "Status";
-        newRow.appendChild(newCell);
+        element = document.getElementById(prefix + "_listing_" + key + "_activity_img")
+        if (element) { element.src = "/static/icons/" + market.tradeGoods[key].activity + ".PNG" }
 
-        newCell = document.createElement("th");
-        newCell.textContent = "Prices";
-        newRow.appendChild(newCell);
+        element = document.getElementById(prefix + "_listing_" + key + "_activity")
+        if (element) { element.innerHTML = market.tradeGoods[key].activity }
 
-        newCell = document.createElement("th");
-        newCell.textContent = "Actions";
-        newRow.appendChild(newCell);
+        element = document.getElementById(prefix + "_listing_" + key + "_tradeVolume")
+        if (element) { element.innerHTML = market.tradeGoods[key].tradeVolume }
 
+        element = document.getElementById(prefix + "_listing_" + key + "_purchasePrice")
+        if (element) { element.innerHTML = market.tradeGoods[key].purchasePrice }
 
-        for (var key in market.tradeGoods) {
-            tg = market.tradeGoods[key];
-            var newRow = table.insertRow();
-            var newCell = newRow.insertCell(0);
-            newCell.textContent = key;
-
-            var newCell = newRow.insertCell(1);
-            text_content = "<img src='/static/icons/" + tg.type + ".png'/>";
-            text_content += "<img src='/static/icons/" + tg.supply + ".png'/>";
-            if (tg.type != "EXCHANGE") { text_content += "<img src='/static/icons/" + tg.activity + ".png'/>" };
-            newCell.innerHTML = text_content;
-
-            var newCell = newRow.insertCell(2);
-            if (tg.type === "EXPORT") {
-                text_content = "buy for : " + tg.purchasePrice;
-            }
-            else if (tg.type === "IMPORT") {
-                text_content = "sell for : " + tg.sellPrice;
-            }
-            else if (tg.type === "EXCHANGE") {
-                text_content = "buy/sell for : " + tg.purchasePrice + "/" + tg.sellPrice;
-            }
-            newCell.textContent = text_content;
-
-            var newCell = newRow.insertCell(3);
-
-            active_ship = document.getElementById('active_ship');
-            if (!active_ship) {
-
-                return;
-            }
-
-            emit_instruction = 'socket.emit(\"buy\", {\"ship_name\":\"' + active_ship.value + '\", \"good\":\"' + key + '\", \"quantity\":' + tg.tradeVolume + '})';
-            inner_html = "<input type = 'button' value = 'buy" + tg.tradeVolume + "' onclick='" + emit_instruction + "'/> ";
-
-            emit_instruction = 'socket.emit(\"buy\", {\"ship_name\":\"' + active_ship.value + '\", \"good\":\"' + key + '\"})';
-            inner_html += "<input type = 'button' value = 'buy max' onclick='" + emit_instruction + "'/>";
-            newCell.innerHTML = inner_html;
-
-
-            //<input type="button" value="buy max" onclick="socket.emit('buy', {'ship_name':'CTRI-W3-1', 'good':'POLYNUCLEOTIDES'})">
-            //<input type="button" value="buy MAX" onclick="socket.emit(" buy',="" {'ship_name':'ctri-w3-1',="" 'good':'fuel})'="">
-        }
+        element = document.getElementById(prefix + "_listing_" + key + "_sellPrice")
+        if (element) { element.innerHTML = market.tradeGoods[key].sellPrice }
     }
+    //<input type="button" value="buy max" onclick="socket.emit('buy', {'ship_name':'CTRI-W3-1', 'good':'POLYNUCLEOTIDES'})">
+    //<input type="button" value="buy MAX" onclick="socket.emit(" buy',="" {'ship_name':'ctri-w3-1',="" 'good':'fuel})'="">
+
 }
+
 socket.on("agent_update", function (data) {
     console.log("Agent update received: " + data);
     //if data is a dict already, assign it to the ship variable. if it's a string, json parse it.
