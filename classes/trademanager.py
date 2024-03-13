@@ -327,7 +327,9 @@ class TradeManager:
                         if selected_destination:
                             matched_o.select_destination(selected_destination)
 
-                        strategy = opp_j.get("strategy", "SKIM")
+                            strategy = opp_j.get("strategy", "MANAGE")
+                        else:
+                            strategy = opp_j.get("strategy", "SKIP")
                         matched_o.strategy = strategy
         except FileNotFoundError:
             self.save_opportunities()
