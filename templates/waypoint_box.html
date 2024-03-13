@@ -6,7 +6,9 @@
     </span>
     <span id="waypoint_output_{{waypoint.symbol}}_has_market">
         {% if waypoint.has_market %}⛽{% endif %}
-    </span><br />
+    </span><span id="waypoint_output_{{waypoint.symbol}}_has_satellite">
+        {% if waypoint.has_satellite %}🛰️{% endif %}</span>
+    <br />
     <span id="waypoint_output_{{waypoint.symbol}}_orbitals">Orbitals: {{waypoint.orbitals_friendly}}</span><br />
     <span id="waypoint_output_{{waypoint.symbol}}_type">{{waypoint.type}}</span><br />
     <div id="waypoint_output_{{waypoint.symbol}}_traits" style="width:100%; height:3em; overflow:hidden;">

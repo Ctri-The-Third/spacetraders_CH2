@@ -114,6 +114,8 @@ def ship_list():
 @app.route("/ships/<ship_name>")
 @check_login
 def display_ship_panel(ship_name):
+    if not ship_name:
+        return ship_list()
     ship = mediator_client.ships_view_one(ship_name)
     if not ship:
         return "Ship not found"
@@ -144,6 +146,10 @@ def view_system(system_symbol):
         "system": system,
         "waypoints": [shf.waypoint_to_dict(wp) for wp in waypoints.values()],
     }
+    ships = mediator_client.ships_view()
+    waypoints = [s.nav.waypoint_symbol for s in ships.values() if s.role == "SATELLITE"]
+    for waypoint in params["waypoints"]:
+        waypoint["has_satellite"] = waypoint["symbol"] in waypoints
     return render_template("system_panel.html", **params)
 
 
@@ -371,6 +377,14 @@ def fetch_waypoint(data, force_refresh=True):
 @app.route("/waypoints/<waypoint_symbol>")
 def view_waypoint(waypoint_symbol):
     params = {"waypoint_symbol": waypoint_symbol}
+    waypoint = mediator_client.waypoints_view_one(waypoint_symbol)
+    market = mediator_client.system_market(waypoint)
+    shipyard = mediator_client.system_shipyard(waypoint)
+    construction = mediator_client.system_construction(waypoint)
+    params["waypoint"] = shf.waypoint_to_dict(waypoint)
+    params["market"] = shf.market_to_dict(market)
+    params["shipyard"] = shf.shipyard_to_dict(shipyard)
+    params["construction"] = shf.construction_to_dict(construction)
     return render_template("waypoint_panel.html", **params)
 
 

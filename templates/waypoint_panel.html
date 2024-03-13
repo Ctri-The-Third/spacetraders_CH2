@@ -31,9 +31,52 @@
             <hr />
         </div>
         <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
-            <h3>Marketplace</h3>
-            <div id="market_output">
-                {{market}}
+            <h3>Marketplace <span id="mkt_symbol">{{market.symbol}}</span></h3>
+            <div id="mkt_{{market.symbol}}">
+
+                <div class="container-fluid" id="mkt_listings">
+                    {% if market %}
+
+
+                    {% for listing in market.tradeGoods %}
+
+                    <div class="row trade_row">
+                        <div class="col-lg-4 " style="overflow:hidden;">
+                            <img src="{{url_for('static', filename = '/icons/GOOD_'+listing.symbol+'.PNG') }}" alt=""
+                                id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_img" />
+                            {{listing.name}}
+                        </div>
+                        <div class="col-lg-3 ">
+                            <span id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_tradeVolume">
+                                {{listing.tradeVolume}}</span>
+                            <img src="{{url_for('static', filename = '/icons/'+ listing.type+'.png')}}"
+                                alt={{listing.type}} />
+
+                            <img src="{{url_for('static', filename = '/icons/'+ listing.supply+'.png')}}"
+                                id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_supply_img"
+                                alt={{listing.supply}} />
+                            {% if listing.activity %}
+                            <img src="{{url_for('static', filename = '/icons/'+ listing.activity+'.png')}}"
+                                alt={{listing.activity}}
+                                id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_activity_img" />
+                            {% endif %}
+
+                        </div>
+                        <div class="col-2 ">
+                            buy:<span id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_purchasePrice">
+                                {{listing.purchasePrice}}</span>
+                        </div>
+                        <div class="col-2 ">
+
+                            sell:<span id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_sellPrice">
+                                {{listing.sellPrice}}</span>
+                        </div>
+
+                    </div>
+                    {% endfor %}
+
+                    {% endif %}
+                </div>
             </div>
             <hr />
         </div>
@@ -100,9 +143,7 @@
             update_waypoint(data);
         });
 
-        socket.on('market-update', function (data) {
-            document.getElementById('market_output').innerHTML = data;
-        });
+
 
         socket.on('shipyard-update', function (data) {
 
