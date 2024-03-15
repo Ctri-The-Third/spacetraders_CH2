@@ -13,7 +13,7 @@ class TradeOpportunity:
         export_tradegood: "TradeGood",
         destination_tradegood: list["TradeGood"],
         selected_destination: str = None,
-        strategy="SKIM",
+        strategy="MANAGE",
     ):
         """An export/ exchange, and any matching destinations.
         The mode determines how the traders should interact with the opportunity
@@ -51,6 +51,9 @@ class TradeOpportunity:
             self.select_destination(selected_destination)
         else:
             self.select_closest_destination()
+
+        if not self.selected_end_good:
+            self.strategy = "SKIP"
 
     def __repr__(self) -> str:
         return f"{self.trade_symbol}: {self.start_location.symbol} -> {self.end_location.symbol}"
