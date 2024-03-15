@@ -16,16 +16,19 @@ Gameplay:
 Milestone 2:
 * ☑️ Waypoint panel 
  * ✅ Market
- * ☑️ Shipyard
+ * ✅ Shipyard
    * ✅ buy ships from UI
-   * Fix the refreshing behaviour
+   * ✅ Fix the refreshing behaviour
  * Construction site
  * present ship dropdown
- * satelitte indicator
- * active ship can be set by query param / linked from ship
-* Pathfinder works again/ ships avble to navigate.
+ * active ship can be set by url param / linked from ship
+* ✅ satelitte indicator
+* ✅ Pathfinder works again/ ships avble to navigate.
 * Ship list has system filters and role filters
 * Bootstrap the ship panel
+* Why are ships failing to complete their processes sometimes?
+  * When ships refuel, they don't undock sometimes. Is this an issue of state imbalance between the ship object inside the "refuel" method and the one outside?
+  * Ships with cargo should be sent to sell what they've got at the best location
 
 
 Milestone 6: 
@@ -37,3 +40,12 @@ Milestone 6:
  * has sell locations (be those exchanges, or imports)
 * mining site panel appears on waypoint panel 
 * Trade panel shows requisite imports, and potential export destinations
+
+
+### Downtime investigation
+
+Every time we wake up/ come back to the game after a while, the ship is not in autopilot mode. 
+Theory: Something about the hourly tick is causing the entry for the ship to stop
+The code doesn't suggest that's happening though.
+
+

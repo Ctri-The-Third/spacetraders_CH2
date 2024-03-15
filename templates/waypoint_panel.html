@@ -62,14 +62,17 @@
                             {% endif %}
 
                         </div>
-                        <div class="col-2 ">
+                        <div class="col-2 col-sm-6">
                             buy:<span id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_purchasePrice">
                                 {{listing.purchasePrice}}</span>
                         </div>
-                        <div class="col-2 ">
+                        <div class="col-2 col-sm-6">
 
                             sell:<span id="mkt_{{market.symbol}}_listing_{{listing.symbol}}_sellPrice">
                                 {{listing.sellPrice}}</span>
+                        </div>
+                        <div class="col-12 small-text">
+                            {{listing.description}}
                         </div>
 
                     </div>
@@ -86,7 +89,6 @@
             <ul id="shipyard_output_ships">
 
             </ul>
-            {{shipyard}}
             <hr />
         </div>
         <div class="col-lg-4 col-md-6 col-sm-12" style="border:1px solid red;">
@@ -134,7 +136,7 @@
 
 
                 for (let i = 0; i < data.modifiers.length; i++) {
-                    document.getElementById('waypoint_output_traits').innerHTML += "<li>" + data.modifiers[i].name + ": " + data.modifiers[i].description + "</li>";
+                    document.getElementById('waypoint_output_traits').innerHTML += "<li>" + data.modifiers[i].name + ": <span class='small-text'>" + data.modifiers[i].description + "</span></li>";
                 }
             }
         }
@@ -146,13 +148,17 @@
 
 
         socket.on('shipyard-update', function (data) {
-
+            document.getElementById('shipyard_output_ships').innerHTML = "";
             for (i in data.ships) {
                 ship = data.ships[i];
 
                 document.getElementById('shipyard_output_ships').innerHTML += "<li id='shipyard_output_" + i + "'>"
                     + ship.name + ": " + ship.purchasePrice
-                    + " <input type='button' value='Buy' onclick='buy_ship(\"" + ship.name + "\", \"" + data.symbol + "\")'/>"
+                    + "<img src = '/static/icons/" + ship.supply + ".png' alt='" + ship.supply + "'/>"
+                    + " <input type='button' value='Buy' onclick='buy_ship(\"" + i + "\", \"" + data.symbol + "\")'/>"
+
+
+                    + "<br/> <div class = small-text>" + ship.description + "</div>"
                     + "</li>";
             }
 

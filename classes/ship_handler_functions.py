@@ -59,8 +59,8 @@ class ShipHandler:
 
         elif distance < ship.fuel_capacity:
 
-            self.refuel(ship_name)
-            client.ship_orbit(ship)
+            if self.refuel(ship_name):
+                client.ship_orbit(ship)
             self._travel_hop(ship, waypoint)
         else:
             origin = client.waypoints_view_one(ship.nav.waypoint_symbol)
@@ -83,7 +83,8 @@ class ShipHandler:
                 if ship.fuel_capacity > 0 and (
                     fuel_needed > ship.fuel_current or ship.fuel_current <= 5
                 ):
-                    self.refuel(ship_name)
+                    if self.refuel(ship_name):
+                        client.ship_orbit(ship)
                 self._travel_hop(ship, waypoint_s)
 
         locker.unlock_early(ship_name)
@@ -306,12 +307,13 @@ class ShipHandler:
 
         locker.unlock_early(ship_name)
 
-    def refuel(self, ship_name: str):
+    def refuel(self, ship_name: str) -> bool:
+        "Returns true if you need to undock"
         client = self.client
         ship = client.ships_view_one(ship_name)
         if not ship:
             self.socket.send(f"Ship not found - {ship.error_code}")
-            return
+            return False
         if ship.nav.status != "DOCKED":
             client.ship_dock(ship)
 
@@ -319,9 +321,10 @@ class ShipHandler:
         if not resp:
             self.socket.send(f"Error refueling ship - {resp.error_code}")
             self.socket.emit("ship-update", ship_to_dict(ship))
-            return
+            return True
         self.socket.send("Ship refueled")
         self.socket.emit("ship-update", ship_to_dict(ship))
+        return True
 
     def log_market_changes(self, market_s: str):
         client = self.client

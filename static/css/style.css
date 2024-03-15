@@ -84,6 +84,11 @@ body a {
     font-size: 11px;
 }
 
+.small-text {
+    font-size: 11px;
+
+}
+
 .highlighted {
     background-color: #555;
 
