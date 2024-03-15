@@ -27,7 +27,7 @@ Milestone 2:
 * Ship list has system filters and role filters
 * Bootstrap the ship panel
 * Why are ships failing to complete their processes sometimes?
-  * When ships refuel, they don't undock sometimes. Is this an issue of state imbalance between the ship object inside the "refuel" method and the one outside?
+  * 🩹 When ships refuel, they don't undock sometimes. Is this an issue of state imbalance between the ship object inside the "refuel" method and the one outside?
   * Ships with cargo should be sent to sell what they've got at the best location
 
 

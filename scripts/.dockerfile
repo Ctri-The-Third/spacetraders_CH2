@@ -7,7 +7,7 @@ run python -m pip install -r requirements.txt
 copy ./spacetraders_sdk  ./spacetraders_sdk
 workdir spacetraders_sdk
 run python3 -m build
-run python3 -m pip install dist/straders-2.1.5-py3-none-any.whl --force-reinstall
+run python3 -m pip install dist/straders-2.2.0-py3-none-any.whl --force-reinstall
 
 
 workdir ..

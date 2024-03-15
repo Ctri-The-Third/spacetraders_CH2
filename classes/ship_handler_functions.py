@@ -23,6 +23,9 @@ class ShipHandler:
         self.pathfinder = PathFinder(client)
 
     def intrasolar_travel(self, ship_name: str, waypoint: str):
+        """
+        `ship_name` - either a string or a Ship object
+        `waypoint` - either a string or a Waypoint object"""
         client = self.client
         if not locker.lock_ship(ship_name, 3600):
             self.socket.send(
@@ -30,8 +33,18 @@ class ShipHandler:
             )
 
             return
-        ship = client.ships_view_one(ship_name)
-        destination = client.waypoints_view_one(waypoint)
+        if isinstance(ship_name, straders_sdk.models.Ship):
+            ship = ship_name
+            ship_name = ship.name
+        else:
+
+            ship = client.ships_view_one(ship_name)
+
+        if isinstance(waypoint, straders_sdk.models.Waypoint):
+            destination = waypoint
+            waypoint = waypoint.symbol
+        else:
+            destination = client.waypoints_view_one(waypoint)
         pf = self.pathfinder
         if not ship:
             self.socket.send(f"Ship not found - {ship.error_code}")
@@ -59,7 +72,7 @@ class ShipHandler:
 
         elif distance < ship.fuel_capacity:
 
-            if self.refuel(ship_name):
+            if self.refuel(ship):
                 client.ship_orbit(ship)
             self._travel_hop(ship, waypoint)
         else:
@@ -83,7 +96,7 @@ class ShipHandler:
                 if ship.fuel_capacity > 0 and (
                     fuel_needed > ship.fuel_current or ship.fuel_current <= 5
                 ):
-                    if self.refuel(ship_name):
+                    if self.refuel(ship):
                         client.ship_orbit(ship)
                 self._travel_hop(ship, waypoint_s)
 
@@ -142,8 +155,11 @@ class ShipHandler:
             )
             return
         quantity = math.ceil(float(quantity))
-
-        ship = client.ships_view_one(ship_name)
+        if isinstance(ship_name, straders_sdk.models.Ship):
+            ship = ship_name
+            ship_name = ship.name
+        else:
+            ship = client.ships_view_one(ship_name)
         if not ship:
             self.socket.send(f"Ship not found - {ship.error_code}")
             locker.unlock_early(ship_name)
@@ -195,7 +211,12 @@ class ShipHandler:
             )
             return
         quantity = math.ceil(float(quantity))
-        ship = client.ships_view_one(ship_name)
+
+        if isinstance(ship_name, straders_sdk.models.Ship):
+            ship = ship_name
+            ship_name = ship.name
+        else:
+            ship = client.ships_view_one(ship_name)
         if not ship:
             self.socket.send(f"Ship not found - {ship.error_code}")
             locker.unlock_early(ship_name)
@@ -274,7 +295,7 @@ class ShipHandler:
             f"Found best trade for {ship.name} - {trade.trade_symbol}, {projected_profit}cr for {trade.distance} units."
         )
         self.execute_trade(
-            ship.name,
+            ship,
             trade.trade_symbol,
             trade.start_location.symbol,
             trade.end_location.symbol,
@@ -290,17 +311,21 @@ class ShipHandler:
         quantity: int,
     ):
         client = self.client
-        ship = client.ships_view_one(ship_name)
+        if isinstance(ship_name, straders_sdk.models.Ship):
+            ship = ship_name
+            ship_name = ship.name
+        else:
+            ship = client.ships_view_one(ship_name)
         tm = trademanager.TradeManager(client)
         quantity = min(math.ceil(float(quantity)), ship.cargo_space_remaining)
 
         tm.claim_trade(trade_symbol, start_location, end_location, quantity)
         self.socket.emit("trades-update", tm.list_opportunities_for_json())
-        self.intrasolar_travel(ship_name, start_location)
-        self.buy(ship_name, trade_symbol, quantity)
+        self.intrasolar_travel(ship, start_location)
+        self.buy(ship, trade_symbol, quantity)
         self.socket.emit("trades-update", tm.list_opportunities_for_json())
-        self.intrasolar_travel(ship_name, end_location)
-        self.sell(ship_name, trade_symbol, quantity)
+        self.intrasolar_travel(ship, end_location)
+        self.sell(ship, trade_symbol, quantity)
         # need to instruct the
         self.socket.send("Trade complete")
         self.socket.emit("trades-update", tm.list_opportunities_for_json())
@@ -308,9 +333,16 @@ class ShipHandler:
         locker.unlock_early(ship_name)
 
     def refuel(self, ship_name: str) -> bool:
+
         "Returns true if you need to undock"
+
         client = self.client
-        ship = client.ships_view_one(ship_name)
+        if isinstance(ship_name, straders_sdk.models.Ship):
+            ship = ship_name
+            ship_name = ship.name
+        else:
+
+            ship = client.ships_view_one(ship_name)
         if not ship:
             self.socket.send(f"Ship not found - {ship.error_code}")
             return False
