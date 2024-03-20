@@ -12,6 +12,7 @@ from straders_sdk.utils import waypoint_to_system, waypoint_suffix
 from classes.ship_handler_functions import ShipHandler
 from classes.trademanager import TradeManager, TradeOpportunity
 from classes.trade_autopilot import TradeAutoPilot
+from classes.miningmanager import MiningManager, MiningSite
 
 app = Flask("C'tri's SpaceTraders Client")
 app.config["SECRET_KEY"] = "notreallythatsecret"
@@ -28,6 +29,7 @@ mediator_client = SpaceTradersMediatorClient(
     db_host=ST_HOST, db_name=ST_NAME, db_user=ST_USER, db_pass=ST_PASS, db_port=ST_PORT
 )
 shf = ShipHandler(mediator_client, socketio)
+mining_manager = MiningManager(mediator_client)
 
 
 def emit_response(raw_response):
@@ -98,6 +100,12 @@ def login():
             return redirect("/")
 
     return render_template("login.html", **params)
+
+
+@app.route("/mining")
+@check_login
+def mining():
+    mining_manager.load_self()
 
 
 @app.route("/ships")
