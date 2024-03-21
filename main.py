@@ -16,7 +16,7 @@ from classes.miningmanager import MiningManager, MiningSite
 
 app = Flask("C'tri's SpaceTraders Client")
 app.config["SECRET_KEY"] = "notreallythatsecret"
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode="threading")
 
 ST_HOST = os.environ.get("ST_DB_HOST", "localhost")
 ST_NAME = os.environ.get("ST_DB_NAME", "spacetraders")
