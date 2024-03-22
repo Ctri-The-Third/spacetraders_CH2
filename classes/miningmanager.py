@@ -2,6 +2,7 @@ import straders_sdk.models as st_models
 import straders_sdk.constants as st_constants
 import straders_sdk.clients as st_clients
 import straders_sdk.utils as st_utils
+import classes.ship_handler_functions as shf
 import threading
 import json
 import time
@@ -13,19 +14,22 @@ class MiningManager:
 
     _instance = None
 
-    def __new__(cls, client: st_clients.SpaceTradersMediatorClient):
+    def __new__(
+        cls, client: st_clients.SpaceTradersMediatorClient, handler: shf.ShipHandler
+    ):
         if cls._instance is None:
             cls._instance = super(MiningManager, cls).__new__(cls)
             cls._instance.__initialized = False
         return cls._instance
 
-    def __init__(self, client: st_clients.SpaceTradersMediatorClient):
+    def __init__(self, client: st_clients.SpaceTradersMediatorClient, socket_context):
         if hasattr(self, "__initialized"):
             return
         self.__initialized = True
+        self.handler = shf.ShipHandler(client, socket_context)
         self.mining_sites: dict[str:MiningSite] = {}
         self.client = client
-        self.load_self()
+        # self.load_self()
 
     def register_asteroid(
         self,
@@ -34,7 +38,7 @@ class MiningManager:
     ):
         if waypoint.symbol in self.mining_sites:
             return
-        self.mining_sites[waypoint.symbol] = MiningSite(waypoint, client)
+        self.mining_sites[waypoint.symbol] = MiningSite(waypoint, client, self.handler)
 
     def init_starting_asteroids(self):
         agent = self.client.view_my_self()
@@ -58,7 +62,7 @@ class MiningManager:
 
             for k, v in data.items():
                 wp = self.client.waypoints_view_one(k)
-                self.mining_sites[k] = MiningSite(wp, self.client)
+                self.mining_sites[k] = MiningSite(wp, self.client, self.handler)
                 self.mining_sites[k].refresh_from_dict(v)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             if len(self.mining_sites) == 0:
@@ -76,11 +80,13 @@ class MiningSite:
         self,
         waypoint: st_models.Waypoint,
         client: st_clients.SpaceTradersMediatorClient,
+        handler: shf.ShipHandler,
     ):
+        self.sh = handler
         self.waypoint = waypoint
         self.waypoint_symbol = waypoint.symbol
         self.ships = {}
-        self.active_thread = None
+        self.extractor_thread = None
         if "ASTEROID" in waypoint.type:
             self.extractables = st_constants.EXTRACTABLES
             self.extractable_destinations = {e: [] for e in self.extractables}
@@ -102,15 +108,18 @@ class MiningSite:
             priority=4,
         )
 
-        self.active_thread = threading.Thread(
+        self.extractor_thread = threading.Thread(
             target=self.execute_extractions, daemon=True, args=(waypoint.type,)
         )
-        self.active_thread.start()
-
+        self.extractor_thread.start()
+        self.sell_thread = threading.Thread(
+            target=self.execute_sell_orders, daemon=True
+        )
+        self.sell_thread.start()
         # we need to make a new client from the old one.
 
     def register_ship(self, ship: st_models.Ship):
-        self.ships[ship.symbol] = ship
+        self.ships[ship.name] = ship
         pass
 
     def to_dict(self):
@@ -149,6 +158,8 @@ class MiningSite:
                 for s in ships.values()
                 if s.nav.waypoint_symbol == self.waypoint_symbol
             ]
+            if not local_ships:
+                best_cooldown = 60
 
             extracted = False
             for ship in local_ships:
@@ -179,6 +190,52 @@ class MiningSite:
 
     def execute_sell_orders(self):
         # for any ship that's full, or not on site, execute any relevant sell order, and return to the site.
+
+        # note, having two threads polling the other is not ideal. We will want to switch this to a queue based system where ships that are invalid for extractions (Because they're full or not present) get punted into a queue that the other thread can pick up.
+        # then the primary thread can pick them back up as part of that thread's normal operation.
+        ships_and_threads = {}
+        while True:
+            if not self.ships:
+                time.sleep(60)
+                continue
+            for ship in self.ships:
+
+                # skip active ships
+                if (
+                    ship.name in ships_and_threads
+                    and ships_and_threads[ship.name].is_alive()
+                ):
+                    continue
+
+                # refresh from the DB.
+                ship = self.client.ships_view_one(ship)
+
+                # sell full ships
+                if ship.cargo_space_remaining == 0:
+
+                    thread = threading.Thread(
+                        target=self._execute_sell_order, args=(ship,)
+                    )
+                    ships_and_threads[ship.name] = thread
+                    thread.start()
+
+                # bring back ships that are not on site
+                if (
+                    ship.cargo_units_used == 0
+                    and ship.nav.waypoint_symbol != self.waypoint_symbol
+                ):
+                    thread = threading.Thread(
+                        target=self.sh.intrasolar_travel,
+                        args=(ship, self.waypoint_symbol),
+                    )
+                    ships_and_threads[ship.name] = thread
+                    thread.start()
+                    pass
+
+            pass
+            time.sleep(15)
+
+    def _execute_sell_order(self, ship: st_models.Ship):
 
         pass
 
