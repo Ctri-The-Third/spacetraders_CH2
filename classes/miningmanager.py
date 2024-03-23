@@ -2,6 +2,7 @@ import straders_sdk.models as st_models
 import straders_sdk.constants as st_constants
 import straders_sdk.clients as st_clients
 import straders_sdk.utils as st_utils
+import logging
 import classes.ship_handler_functions as shf
 import threading
 import json
@@ -14,9 +15,7 @@ class MiningManager:
 
     _instance = None
 
-    def __new__(
-        cls, client: st_clients.SpaceTradersMediatorClient, handler: shf.ShipHandler
-    ):
+    def __new__(cls, client: st_clients.SpaceTradersMediatorClient, socket_context):
         if cls._instance is None:
             cls._instance = super(MiningManager, cls).__new__(cls)
             cls._instance.__initialized = False
@@ -67,6 +66,8 @@ class MiningManager:
         except (FileNotFoundError, json.JSONDecodeError) as e:
             if len(self.mining_sites) == 0:
                 self.init_starting_asteroids()
+        except Exception as e:
+            print(e)
 
     def save_self(self):
         with open("resources/mining_manager.json", "w+") as f:
@@ -85,6 +86,7 @@ class MiningSite:
         self.sh = handler
         self.waypoint = waypoint
         self.waypoint_symbol = waypoint.symbol
+        self.logger = logging.getLogger("MiningSite")
         self.ships = {}
         self.extractor_thread = None
         if "ASTEROID" in waypoint.type:
@@ -107,15 +109,16 @@ class MiningSite:
             db_pass=connection_pool.db_pass,
             priority=4,
         )
-
         self.extractor_thread = threading.Thread(
             target=self.execute_extractions, daemon=True, args=(waypoint.type,)
         )
         self.extractor_thread.start()
+
         self.sell_thread = threading.Thread(
             target=self.execute_sell_orders, daemon=True
         )
         self.sell_thread.start()
+
         # we need to make a new client from the old one.
 
     def register_ship(self, ship: st_models.Ship):
@@ -150,6 +153,7 @@ class MiningSite:
             }
             best_cooldown = delays.get(type, 6)
             ships = self.client.ships_view()
+            # this is not returning cooldown information
             if not ships:
                 time.sleep(60)
                 continue
@@ -169,16 +173,16 @@ class MiningSite:
                 if not ship.can_extract and not ship.can_siphon:
                     continue
                 if ship.seconds_until_cooldown > 0:
-                    best_cooldown = max(best_cooldown, ship.seconds_until_cooldown)
+                    best_cooldown = min(best_cooldown, ship.seconds_until_cooldown)
                     continue
                 if ship.cargo_space_remaining == 0:
                     continue
                 extracted = extraction_method(ship)
                 if extracted:
-                    print(f"ship {ship.name} extracted at {self.waypoint_symbol}")
-                break
-            if not extracted:
-                time.sleep(best_cooldown)
+                    self.logger.info("ship %s extracted successfully", ship.name)
+                    best_cooldown = delays.get(type, 6)
+
+            time.sleep(best_cooldown)
 
         # total number of ships on site * their cooldown = total consumption time
         # assuming a max of 10 extractions a minute,
@@ -194,21 +198,31 @@ class MiningSite:
         # note, having two threads polling the other is not ideal. We will want to switch this to a queue based system where ships that are invalid for extractions (Because they're full or not present) get punted into a queue that the other thread can pick up.
         # then the primary thread can pick them back up as part of that thread's normal operation.
         ships_and_threads = {}
+        did_something = True
+
         while True:
             if not self.ships:
                 time.sleep(60)
                 continue
-            for ship in self.ships:
+            did_something = False
+            for ship_symbol, ship in self.ships.items():
 
                 # skip active ships
+
                 if (
-                    ship.name in ships_and_threads
-                    and ships_and_threads[ship.name].is_alive()
+                    ship_symbol in ships_and_threads
+                    and ships_and_threads[ship_symbol].is_alive()
                 ):
                     continue
 
+                # ship ships that are at the site and don't have full cargos
+                if (ship.nav.waypoint_symbol == self.waypoint_symbol) and (
+                    ship.cargo_space_remaining > 0
+                ):
+                    continue
+                did_something = True
                 # refresh from the DB.
-                ship = self.client.ships_view_one(ship)
+                ship = self.client.ships_view_one(ship_symbol)
 
                 # sell full ships
                 if ship.cargo_space_remaining == 0:

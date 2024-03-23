@@ -29,7 +29,7 @@ mediator_client = SpaceTradersMediatorClient(
     db_host=ST_HOST, db_name=ST_NAME, db_user=ST_USER, db_pass=ST_PASS, db_port=ST_PORT
 )
 shf = ShipHandler(mediator_client, socketio)
-mining_manager = MiningManager(mediator_client)
+mining_manager = MiningManager(mediator_client, socketio)
 
 
 def emit_response(raw_response):
@@ -106,6 +106,7 @@ def login():
 @check_login
 def mining():
     mining_manager.load_self()
+    return "mining manager loaded and active"
 
 
 @app.route("/ships")
