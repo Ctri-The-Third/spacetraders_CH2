@@ -73,6 +73,7 @@ class TradeOpportunity:
             "supply": self.start_good.supply,
             "activity": self.start_good.activity,
             "export_tv": self.export_tv,
+            "scanned_start": self.start_good.buy_price != 0,
             "goods_produced_per_hour": self.goods_produced_per_hour,
             "profit_per_unit_per_distance": round(
                 self.profit_per_unit / max(self.distance, 1), 2
@@ -81,8 +82,10 @@ class TradeOpportunity:
         }
         if self.end_location:
             out_obj["end_location"] = self.end_location.symbol
+            out_obj["scanned_end"] = self.selected_end_good.sell_price != 0
         else:
             out_obj["end_location"] = ""
+            out_obj["scanned_end"] = False
         return out_obj
 
     def select_destination(self, destination_symbol: str):
@@ -163,6 +166,7 @@ class TradeOpportunity:
                 "SCARCE": 0,
                 "UNKNOWN": 0,
             }
+
         self.total_quantity = (
             self.start_good.trade_volume * supplies[self.start_good.supply]
         )
@@ -170,9 +174,12 @@ class TradeOpportunity:
     def update_prices(self):
         if not self.selected_end_good:
             return
-        self.profit_per_unit = (
-            self.selected_end_good.sell_price - self.start_good.buy_price
-        )
+        if not self.selected_end_good.sell_price or not self.start_good.buy_price:
+            self.profit_per_unit = 0
+        else:
+            self.profit_per_unit = (
+                self.selected_end_good.sell_price - self.start_good.buy_price
+            )
 
         self.current_profit_ptrip_pvolume_phour = (
             self.profit_per_unit * self.total_quantity / max(self.distance, 1)
@@ -419,6 +426,10 @@ class TradeManager:
                 )
                 return_obj["manufactures"] = st_const.MANUFACTURES.get(tg.symbol, [])
                 return_obj["possible_locations"] = {}
+                return_obj["scanned_start_b"] = tg.buy_price != 0
+                return_obj["scanned_end_b"] = (
+                    opportunity.selected_end_good.sell_price != 0
+                )
                 for end_good in opportunity.possible_end_goods:
                     return_obj["possible_locations"][end_good.waypoint.symbol] = {
                         "sell_price": end_good.sell_price,
@@ -519,7 +530,7 @@ class TradeManager:
                 opportunity: TradeOpportunity
                 systems[system].append(opportunity.to_dict())
             systems[system].sort(
-                key=lambda x: (x["profit_per_unit_per_distance"] * x["total_quantity"]),
+                key=lambda x: (x["profit_per_unit_per_distance"]),
                 reverse=True,
             )
         return systems

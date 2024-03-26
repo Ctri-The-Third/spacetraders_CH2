@@ -169,7 +169,12 @@ def view_trade_manager():
     params = {}
     ships = mediator_client.ships_view()
     params["trades"] = tm.list_opportunities_for_json()
-    params["ships"] = [shf.ship_to_dict(ship) for ship in ships.values()]
+    params["ships"] = [
+        shf.ship_to_dict(ship)
+        for ship in ships.values()
+        if ship.role in ["TRANSPORT", "HAULER", "COMMAND"]
+    ]
+    params["agent"] = shf.agent_to_dict(mediator_client.view_my_self())
     return render_template("trade_list.html", **params)
 
 
@@ -361,6 +366,7 @@ def get_trades():
 def fetch_trades():
     tm = TradeManager(mediator_client)
     tm.populate_opportunities()
+    tm.update_opportunities()
     emit("trades-update", tm.list_opportunities_for_json())
 
 
@@ -381,6 +387,14 @@ def fetch_waypoint(data, force_refresh=True):
     waypoint = mediator_client.waypoints_view_one(data, force=force_refresh)
     output = shf.waypoint_to_dict(waypoint)
     emit("waypoint-update", output)
+
+
+@app.route("/hq")
+def view_hq():
+    agent = mediator_client.view_my_self()
+    if not agent:
+        return "Agent not found"
+    return redirect(f"/systems/{waypoint_to_system(agent.headquarters)}")
 
 
 @app.route("/waypoints/<waypoint_symbol>")

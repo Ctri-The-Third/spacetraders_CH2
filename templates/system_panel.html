@@ -3,19 +3,31 @@
 
 {% include '_header.html' %}
 {% include 'top_menu.html' %}
-<h1><span id=system_output_symbol>{{system.symbol}}</span><a href="#"
-        onclick="socket.emit('fetch-system','{{system.symbol}}');">🔃</a></h1>
-<span id="system_output_system_type">{{system.system_type}}</span> at <span id="system_output_x">{{system.x}}</span>,
-<span id="system_output_y">{{system.y}}</span>
-<div id="system_output_{{system.symbol}}" class="container-fluid">
-    <div class="row">
-        {% for waypoint in waypoints %}
-        <div class="col-xl-2  col-lg-2 col-sm-3">
-            {% include 'waypoint_box.html' %}
+<Div class="container-fluid">
+    <Div class="row">
+        <div class="col-4">
+            <h1><span id=system_output_symbol>{{system.symbol}}</span><a href="#"
+                    onclick="socket.emit('fetch-system','{{system.symbol}}');">🔃</a></h1>
+            <span id="system_output_system_type">{{system.system_type}}</span> at <span
+                id="system_output_x">{{system.x}}</span>,
+            <span id="system_output_y">{{system.y}}</span>
+
         </div>
-        {% endfor %}
+        <div class="col-8">
+            <div id="logs_output" class="logs_output">
+            </div>
+
+        </div>
+    </Div>
+    <div id="system_output_{{system.symbol}}" class="container-fluid">
+        <div class="row">
+            {% for waypoint in waypoints %}
+            <div class="col-xl-2  col-lg-2 col-sm-3">
+                {% include 'waypoint_box.html' %}
+            </div>
+            {% endfor %}
+        </div>
     </div>
-</div>
 
 </html>
 

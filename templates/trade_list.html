@@ -13,11 +13,12 @@
                 {% for ship in ships %}
                 <option value="{{ship.symbol}}">{{ship.symbol}}</option>
                 {% endfor %}
-            </select>
-
+            </select><br />
+            Current credits: <span id="agent_output_credits">{{agent.credits}}</span>
         </div>
         <div class=" col-lg-2 col-md-2 col-sm-6  ">
             <div id="selected_ship"></div>
+
             <div id="selected_ship_controls">
                 <input type="button" value="execute best for ship" id="ship_autopilot_control"
                     onclick="execute_best(); return false;" /><br />
@@ -166,9 +167,13 @@
 
                 newCell = document.createElement("div");
                 newCell.className = "col-lg-4 col-sm-12";
-                text_content = "<a href = 'waypoints/" + op.start_location + "'>" + op.start_location + "</a>"
+                // if missing start, then add in a ❓ before the start location
+                missing_start_t = op.scanned_start ? "" : "❓"
+                missing_end_t = op.scanned_end ? "" : "❓"
+
+                text_content = "<a href = 'waypoints/" + missing_start_t + op.start_location + "'>" + missing_start_t + op.start_location + "</a>"
                     + " -> "
-                    + "<a href = 'waypoints/" + op.end_location + "'>" + op.end_location + "</a>"
+                    + "<a href = 'waypoints/" + op.end_location + "'>" + missing_end_t + op.end_location + "</a>"
                     + " (" + op.distance + ")";
                 newCell.innerHTML = text_content;
                 newRow.appendChild(newCell);

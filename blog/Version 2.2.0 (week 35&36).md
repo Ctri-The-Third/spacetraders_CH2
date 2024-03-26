@@ -34,9 +34,9 @@ Milestone 2:
 Milestone 3: 
 * ✅ Mining site class 
  * has management UI
- * ✅ knows what it can export
- * has strategy (disabled, extract_and_chill, extract_and_sell)
- * ❌ has assigned shpips (just extractors)
+ * ✅ knows what it can export, and where too.
+ * Can broadcast available goods to the trade manager
+ * ❌ has assigned ships (just extractors)
  * has sell locations (be those exchanges, or imports)
 * mining site panel appears on waypoint panel 
 * Trade panel shows requisite imports, and potential export destinations
