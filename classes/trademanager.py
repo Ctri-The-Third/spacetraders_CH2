@@ -28,18 +28,18 @@ class TradeOpportunity:
         self.start_location = export_tradegood.waypoint
 
         self.possible_end_goods = destination_tradegood
-        self.selected_end_good = None
+        self._selected_end_good = None
         self.trade_symbol = export_tradegood.symbol
         self._pathfinder = st_pathfinder.PathFinder(client)
 
-        self.end_location = None
+        self._end_location = None
         self.distance = 0
-        self.profit_per_unit = 0
+        self.tmp_profit_per_unit = 0
         self.total_quantity = 0
         self.export_tv = self.start_good.trade_volume
         self.goods_produced_per_hour = 0
         self.current_profit_ptrip_pvolume_phour = 0
-
+        self.tmp_end_location = None
         self.activity_modifiers = {
             "RESTRICTED": 0.5,
             "WEAK": 1,
@@ -49,16 +49,47 @@ class TradeOpportunity:
         }
         if selected_destination:
             self.select_destination(selected_destination)
-        else:
-            self.select_closest_destination()
 
         if not self.selected_end_good:
             self.strategy = "SKIP"
 
-    def __repr__(self) -> str:
-        return f"{self.trade_symbol}: {self.start_location.symbol} -> {self.end_location.symbol}"
+    @property
+    def selected_end_good(self):
+        best_opportunity = self.select_best_opportunity()
+        if not self._selected_end_good:
+            self.update_prices(best_opportunity)
+            return best_opportunity
+        return self._selected_end_good
 
-    def to_dict(self) -> dict:
+    def select_best_opportunity(self):
+        if not self.possible_end_goods:
+            return None
+        best = self.possible_end_goods[0]
+        sell_price = 0
+        best_score = 0
+        source_wp = self.start_location
+        for good in self.possible_end_goods:
+            good: TradeGood
+            sell_price = good.sell_price if good.sell_price > 0 else 1
+            buy_price = (
+                self.start_good.buy_price if self.start_good.buy_price > 0 else 1
+            )
+            destination = good.waypoint
+            score = (sell_price - buy_price) / max(
+                self._pathfinder.calc_distance_between(source_wp, destination), 1
+            )
+            if score > best_score:
+                best_score = score
+                best = good
+        self._selected_end_good = best
+        return best
+
+    def __repr__(self) -> str:
+        return f"{self.trade_symbol}: {self.start_location.symbol} -> {self.tmp_end_location.symbol}"
+
+    def to_dict(self, with_impermanent_data: bool = False) -> dict:
+
+        # design difficulty! profit_per_unit doesn't get permanetly set always.
 
         out_obj = {
             "trade_symbol": self.trade_symbol,
@@ -68,31 +99,46 @@ class TradeOpportunity:
                 x.waypoint.symbol for x in self.possible_end_goods
             ],
             "distance": math.ceil(self.distance),
-            "profit_per_unit": self.profit_per_unit,
             "total_quantity": self.total_quantity,
             "supply": self.start_good.supply,
             "activity": self.start_good.activity,
             "export_tv": self.export_tv,
             "scanned_start": self.start_good.buy_price != 0,
             "goods_produced_per_hour": self.goods_produced_per_hour,
-            "profit_per_unit_per_distance": round(
-                self.profit_per_unit / max(self.distance, 1), 2
-            ),
             "strategy": self.strategy,
         }
-        if self.end_location:
-            out_obj["end_location"] = self.end_location.symbol
-            out_obj["scanned_end"] = self.selected_end_good.sell_price != 0
-        else:
-            out_obj["end_location"] = ""
-            out_obj["scanned_end"] = False
+
+        out_obj["profit_per_unit"] = 0
+        out_obj["end_location"] = ""
+        out_obj["scanned_end"] = False
+        out_obj["profit_per_unit_per_distance"] = 0
+
+        if self._selected_end_good:
+            out_obj["end_location"] = self._selected_end_good.waypoint.symbol
+            out_obj["scanned_end"] = self._selected_end_good.sell_price != 0
+            out_obj["profit_per_unit"] = self.tmp_profit_per_unit
+            out_obj["profit_per_unit_per_distance"] = round(
+                self.tmp_profit_per_unit / max(self.distance, 1), 2
+            )
+            #             "profit_per_unit_per_distance": round( self.profit_per_unit / max(self.distance, 1), 2),
+
+        elif with_impermanent_data:
+            # generate temporary profit per unit and profit per unit per distance
+            temp = self.select_best_opportunity()
+            if temp:
+                self.update_prices(temp)
+                out_obj["end_location"] = temp.waypoint.symbol
+                out_obj["profit_per_unit"] = self.tmp_profit_per_unit
+                out_obj["profit_per_unit_per_distance"] = round(
+                    self.tmp_profit_per_unit / max(self.distance, 1), 2
+                )
         return out_obj
 
     def select_destination(self, destination_symbol: str):
         for good in self.possible_end_goods:
             if good.waypoint.symbol == destination_symbol:
-                self.selected_end_good = good
-                self.end_location = good.waypoint
+                self._selected_end_good = good
+                self._end_location = good.waypoint
                 return
 
     def select_closest_destination(self):
@@ -109,20 +155,23 @@ class TradeOpportunity:
                 best_distance = distance
                 closest = good
         self.selected_end_good = closest
-        self.end_location = closest.waypoint
+        self.tmp_end_location = closest.waypoint
 
     def set_additional_properties(self):
         if not self.selected_end_good:
             return
 
         self.export_tv = self.start_good.trade_volume
-        self.end_location = self.selected_end_good.waypoint
-        self.goods_produced_per_hour = (
-            self.activity_modifiers[self.start_good.activity]
-            * self.start_good.trade_volume
-        )
+        self.tmp_end_location = self.selected_end_good.waypoint
+        if not self.start_good.activity:
+            self.goods_produced_per_hour = 0
+        else:
+            self.goods_produced_per_hour = (
+                self.activity_modifiers[self.start_good.activity]
+                * self.start_good.trade_volume
+            )
         self.distance = self._pathfinder.calc_distance_between(
-            self.start_location, self.end_location
+            self.start_location, self.tmp_end_location
         )
         self.update_prices()
 
@@ -171,18 +220,18 @@ class TradeOpportunity:
             self.start_good.trade_volume * supplies[self.start_good.supply]
         )
 
-    def update_prices(self):
-        if not self.selected_end_good:
+    def update_prices(self, temp_end_good=None):
+        if not self._selected_end_good and not temp_end_good:
             return
-        if not self.selected_end_good.sell_price or not self.start_good.buy_price:
-            self.profit_per_unit = 0
+        # either the player-selected good, or whatever temporary thing we're feeding.
+        source = self._selected_end_good or temp_end_good
+        if not source.sell_price or not self.start_good.buy_price:
+            self.tmp_profit_per_unit = 0
         else:
-            self.profit_per_unit = (
-                self.selected_end_good.sell_price - self.start_good.buy_price
-            )
+            self.tmp_profit_per_unit = source.sell_price - self.start_good.buy_price
 
         self.current_profit_ptrip_pvolume_phour = (
-            self.profit_per_unit * self.total_quantity / max(self.distance, 1)
+            self.tmp_profit_per_unit * self.total_quantity / max(self.distance, 1)
         )
 
 
@@ -274,11 +323,23 @@ class TradeManager:
         for system_symbol, system in systems.items():
             for tg_symbol, goods_list in system.items():
                 goods_list
-                exports = [x for x in goods_list if x.type in "EXPORT"]
-                imports = [x for x in goods_list if x.type in ["IMPORT", "EXCHANGE"]]
+
+                exports = []
+                imports = []
+
+                for x in goods_list:
+                    valid = False
+                    if x.type in ["EXPORT", "IMPORT"]:
+                        valid = True
+                    if x.type in ["EXPORT", "EXCHANGE"]:
+                        exports.append(x)
+                    if x.type in ["IMPORT", "EXCHANGE"]:
+                        imports.append(x)
 
                 for export in exports:
-
+                    # if the export is an exchange and there's only one import that's an exchange - skip.
+                    if export.symbol == "FUEL" and export.type == "EXCHANGE":
+                        continue
                     opportunities[system_symbol].append(
                         TradeOpportunity(self.client, export, imports)
                     )
@@ -384,7 +445,7 @@ class TradeManager:
                 continue
             if opportunity.distance > max_distance:
                 continue
-            if opportunity.profit_per_unit < 0:
+            if opportunity.tmp_profit_per_unit < 0:
                 continue
             if opportunity.total_quantity <= 0:
                 continue
@@ -395,7 +456,7 @@ class TradeManager:
                 + opportunity.distance
             )
             potential_quantity = min(opportunity.total_quantity, ship_cargo_capacity)
-            score = (opportunity.profit_per_unit * potential_quantity) / max(
+            score = (opportunity.tmp_profit_per_unit * potential_quantity) / max(
                 total_distance, 1
             )
             valid_opportunities.append((score, opportunity))
@@ -517,18 +578,20 @@ class TradeManager:
 
         # score = (opportunity.profit_per_unit * potential_quantity) / total_distance
         self.opportunities.get(system_symbol, []).sort(
-            key=lambda x: (x.profit_per_unit * x.total_quantity / max(x.distance, 1)),
+            key=lambda x: (
+                x.tmp_profit_per_unit * x.total_quantity / max(x.distance, 1)
+            ),
             reverse=True,
         )
         return self.opportunities.get(system_symbol, [])
 
-    def list_opportunities_for_json(self):
+    def list_opportunities_for_json(self, with_impermanent_data=False):
         systems = {}
         for system in self.opportunities:
             systems[system] = []
             for opportunity in self.list_opportunities(system):
                 opportunity: TradeOpportunity
-                systems[system].append(opportunity.to_dict())
+                systems[system].append(opportunity.to_dict(with_impermanent_data))
             systems[system].sort(
                 key=lambda x: (x["profit_per_unit_per_distance"]),
                 reverse=True,
@@ -548,7 +611,7 @@ class TradeManager:
                 if (
                     opportunity.trade_symbol == trade_symbol
                     and opportunity.start_location.symbol == start_location
-                    and opportunity.end_location.symbol == end_location
+                    and opportunity.tmp_end_location.symbol == end_location
                 ):
                     opportunity.total_quantity -= quantity
 

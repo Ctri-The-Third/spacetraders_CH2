@@ -29,7 +29,6 @@ mediator_client = SpaceTradersMediatorClient(
     db_host=ST_HOST, db_name=ST_NAME, db_user=ST_USER, db_pass=ST_PASS, db_port=ST_PORT
 )
 shf = ShipHandler(mediator_client, socketio)
-mining_manager = MiningManager(mediator_client, socketio)
 
 
 def emit_response(raw_response):
@@ -105,7 +104,9 @@ def login():
 @app.route("/mining")
 @check_login
 def mining():
-    mining_manager.load_self()
+    mm = MiningManager(mediator_client, socketio)
+    mm.load_self()
+
     return "mining manager loaded and active"
 
 
@@ -359,7 +360,7 @@ def fetch_ship(data, force_refresh=True):
 @socketio.on("get-trades")
 def get_trades():
     tm = TradeManager(mediator_client)
-    emit("trades-update", tm.list_opportunities_for_json())
+    emit("trades-update", tm.list_opportunities_for_json(True))
 
 
 @socketio.on("fetch-trades")
@@ -367,7 +368,7 @@ def fetch_trades():
     tm = TradeManager(mediator_client)
     tm.populate_opportunities()
     tm.update_opportunities()
-    emit("trades-update", tm.list_opportunities_for_json())
+    emit("trades-update", tm.list_opportunities_for_json(True))
 
 
 @socketio.on("fetch-trade")
