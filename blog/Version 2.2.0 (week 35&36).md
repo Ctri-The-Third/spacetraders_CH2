@@ -26,7 +26,7 @@ Milestone 2:
 * ✅ Pathfinder works again/ ships avble to navigate.
 * Ship list has system filters and role filters
 * Bootstrap the ship panel
-* Why are ships failing to complete their processes sometimes?
+* ✅ Why are ships failing to complete their processes sometimes?
   * 🩹 When ships refuel, they don't undock sometimes. Is this an issue of state imbalance between the ship object inside the "refuel" method and the one outside?
   * Ships with cargo should be sent to sell what they've got at the best location
 
@@ -36,8 +36,10 @@ Milestone 3:
  * has management UI
  * ✅ knows what it can export, and where too.
  * Can broadcast available goods to the trade manager
- * ❌ has assigned ships (just extractors)
- * has sell locations (be those exchanges, or imports)
+   * 🐛 when we arrive and sell, it's causing the trade manager to do FULL refresh of all unseen markets, as is proper. Need to add in functionality for checking if a ship is present before doing that.
+ * ✅ has assigned ships (just extractors)
+ * ✅ has sell locations (be those exchanges, or imports)
+   * ✅ after selling, the rtb instruction fails wasting a request before the other thread picks it up.
 * mining site panel appears on waypoint panel 
 * Trade panel shows requisite imports, and potential export destinations
 
@@ -49,3 +51,21 @@ Theory: Something about the hourly tick is causing the entry for the ship to sto
 The code doesn't suggest that's happening though.
 
 
+### ships aren't singletons
+
+But they really should be. A ship with a given symbol should be the same ship everywhere.
+
+The cache should have an internal dict of ship objects that are returned, or populated as necessary.
+The "update" method should also update the SDK's ship object.
+
+BUT WAIT there's more - we use multiple instances of the SDK in different places. 
+Q. Is this where we talk about generators and yield statements?  
+A. No - those are for synthetic loops
+
+Q. Should we make a threadsafe ships and markets cache baked into the SDK so that all markets and ships returned are the same object? Yes. 
+
+
+### Ship exports without fixed destinations!
+
+currently rendering, but price / profit information not being set.
+Also, need to exclude trade opportunities that only EXCHANGE to EXCHANGE trades.
