@@ -182,7 +182,8 @@
                 newCell = document.createElement("div");
                 newCell.className = "col-lg-2 col-sm-6";
                 text_content = "<img src='/static/icons/" + op.supply + ".png' />" + op.total_quantity + " (" + op.export_tv + "), ";
-                text_content += "<img src='/static/icons/" + op.activity + ".png' />+" + op.goods_produced_per_hour + "/h";
+                // if op.activity is not empty, then add in an icon
+                if (op.activity != "" && op.activity != "None" && op.activity != null) { text_content += "<img src='/static/icons/" + op.activity + ".png' />+" + op.goods_produced_per_hour + "/h"; }
                 newCell.innerHTML = text_content;
                 newRow.appendChild(newCell);
 

@@ -27,19 +27,19 @@ class ShipHandler:
         `ship_name` - either a string or a Ship object
         `waypoint` - either a string or a Waypoint object"""
         client = self.client
-        if not locker.lock_ship(ship_name, 3600):
-            self.socket.send(
-                f"Unable to lock {ship_name} for intrasolar travel, expires in {locker.when_does_lock_expire(ship_name)} seconds"
-            )
 
-            return
         if isinstance(ship_name, straders_sdk.models.Ship):
             ship = ship_name
             ship_name = ship.name
         else:
 
             ship = client.ships_view_one(ship_name)
+        if not locker.lock_ship(ship_name, 3600):
+            self.socket.send(
+                f"Unable to lock {ship_name} for intrasolar travel, expires in {locker.when_does_lock_expire(ship_name)} seconds"
+            )
 
+            return
         if isinstance(waypoint, straders_sdk.models.Waypoint):
             destination = waypoint
             waypoint = waypoint.symbol
@@ -149,11 +149,6 @@ class ShipHandler:
 
     def buy(self, ship_name: str, good: str, quantity: int):
         client = self.client
-        if not locker.lock_ship(ship_name, 3600):
-            self.socket.send(
-                f"Unable to lock {ship_name} for cargo buying, expires in {locker.when_does_lock_expire(ship_name)} seconds"
-            )
-            return
         quantity = math.ceil(float(quantity))
         if isinstance(ship_name, straders_sdk.models.Ship):
             ship = ship_name
@@ -164,6 +159,13 @@ class ShipHandler:
             self.socket.send(f"Ship not found - {ship.error_code}")
             locker.unlock_early(ship_name)
             return
+
+        if not locker.lock_ship(ship_name, 3600):
+            self.socket.send(
+                f"Unable to lock {ship_name} for cargo buying, expires in {locker.when_does_lock_expire(ship_name)} seconds"
+            )
+            return
+
         if ship.nav.status != "DOCKED":
             client.ship_dock(ship)
         if quantity == 0:
@@ -205,12 +207,6 @@ class ShipHandler:
 
     def sell(self, ship_name: str, good: str, quantity: int):
         client = self.client
-        if not locker.lock_ship(ship_name, 3600):
-            self.socket.send(
-                f"Unable to lock {ship_name} for cargo selling, expires in {locker.when_does_lock_expire(ship_name)} seconds"
-            )
-            return
-        quantity = math.ceil(float(quantity))
 
         if isinstance(ship_name, straders_sdk.models.Ship):
             ship = ship_name
@@ -221,6 +217,14 @@ class ShipHandler:
             self.socket.send(f"Ship not found - {ship.error_code}")
             locker.unlock_early(ship_name)
             return
+
+        if not locker.lock_ship(ship_name, 3600):
+            self.socket.send(
+                f"Unable to lock {ship_name} for cargo selling, expires in {locker.when_does_lock_expire(ship_name)} seconds"
+            )
+            return
+        quantity = math.ceil(float(quantity))
+
         found_cargo_item = None
         for c in ship.cargo_inventory:
             if c.symbol == good:
@@ -283,11 +287,11 @@ class ShipHandler:
             self.socket.send(f"Couldn't find a trade for ship {ship.name}")
             return
 
-        if not trade.end_location:
+        if not trade.tmp_end_location:
             self.socket.send(f"Trade {trade.trade_symbol} end location not found")
             return
         trade: trademanager.TradeOpportunity
-        projected_profit = trade.profit_per_unit * min(
+        projected_profit = trade.tmp_profit_per_unit * min(
             trade.total_quantity, ship.cargo_capacity
         )
 
@@ -298,7 +302,7 @@ class ShipHandler:
             ship,
             trade.trade_symbol,
             trade.start_location.symbol,
-            trade.end_location.symbol,
+            trade.tmp_end_location.symbol,
             trade.total_quantity,
         )
 
@@ -318,7 +322,11 @@ class ShipHandler:
             ship = client.ships_view_one(ship_name)
         tm = trademanager.TradeManager(client)
         quantity = min(math.ceil(float(quantity)), ship.cargo_space_remaining)
-
+        if not locker.lock_ship(ship_name, 3600):
+            self.socket.send(
+                f"Unable to lock {ship_name} for complete trade , expires in {locker.when_does_lock_expire(ship_name)} seconds"
+            )
+            return
         tm.claim_trade(trade_symbol, start_location, end_location, quantity)
         self.socket.emit("trades-update", tm.list_opportunities_for_json())
         self.intrasolar_travel(ship, start_location)
@@ -594,7 +602,7 @@ def ship_to_dict(ship: straders_sdk.models.Ship):
             "shipSymbol": ship.name,
             "totalSeconds": ship._cooldown_length,
             "remainingSeconds": ship.seconds_until_cooldown,
-            "expiration": ship._cooldown_expiration,
+            "expiration": None,
         },
         "modules": [],
         "mounts": [],
@@ -609,6 +617,8 @@ def ship_to_dict(ship: straders_sdk.models.Ship):
             "consumed": {"amount": 0, "timestamp": "2019-08-24T14:15:22Z"},
         },
     }
+    if ship._cooldown_expiration:
+        return_obj["cooldown"]["expiration"] = ship._cooldown_expiration.isoformat()
     for cargo in ship.cargo_inventory:
         return_obj["cargo"]["inventory"].append(
             {

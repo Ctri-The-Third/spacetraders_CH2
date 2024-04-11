@@ -1,6 +1,7 @@
 # import the mutex lock
 from threading import Lock, current_thread
 from datetime import datetime, timedelta
+import logging
 
 
 class ShipLocker:
@@ -15,6 +16,8 @@ class ShipLocker:
     def __init__(self):
         self._ships = {}
         self.lock = Lock()
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
 
     def lock_ship(self, ship_name: str, lock_duration: int, lock_id: str = None):
         if not lock_id:
@@ -24,10 +27,15 @@ class ShipLocker:
                 self._ships[ship_name] = None
             lock = self._ships[ship_name]
             if lock and lock.seconds_remaining > 0 and lock.lock_id != lock_id:
+                self.logger.debug(
+                    f"Ship {ship_name} already locked by {lock.lock_id} - couldn't be locked by {lock_id}"
+                )
                 return False
             else:
                 self._ships[ship_name] = ShipLock(ship_name, lock_id, lock_duration)
-            return True
+                self.logger.debug(f"Ship {ship_name} locked by {lock_id}")
+                return True
+        return None
 
     def do_i_have_the_lock(self, ship_name: str, lock_id: str):
         with self.lock:
@@ -69,9 +77,15 @@ class ShipLocker:
 
                 if self._ships[ship_name].lock_id == lock_id or force:
                     self._ships[ship_name] = None
+
+                    self.logger.debug(f"Ship {ship_name} unlocked by {lock_id}")
                     return True
                 else:
+                    self.logger.debug(
+                        f"Ship {ship_name} unlock failed by {lock_id} - existing lock_id = {self._ships[ship_name].lock_id}"
+                    )
                     return False
+
             return True
 
 
